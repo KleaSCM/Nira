@@ -22,19 +22,22 @@ class RPStoryCard {
   int? id;
   String title;
   String content;
+  String world;
 
-  RPStoryCard({this.id, required this.title, required this.content});
+  RPStoryCard({this.id, required this.title, required this.content, this.world = ''});
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
         'title': title,
         'content': content,
+        'world': world,
       };
 
   factory RPStoryCard.fromMap(Map<String, dynamic> m) => RPStoryCard(
         id: m['id'] as int?,
         title: m['title'] as String,
         content: m['content'] as String,
+        world: (m['world'] as String?) ?? '',
       );
 }
 

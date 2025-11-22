@@ -26,8 +26,10 @@ class _CharacterEditorState extends State<CharacterEditor> {
     if (name.isEmpty) return;
     final desc = _desc.text.trim();
     final c = RPCharacter(name: name, description: desc);
-    await RolePlayRepository().insertCharacter(c);
-    Navigator.pop(context, c);
+    final id = await RolePlayRepository().insertCharacter(c);
+    final created = RPCharacter(id: id, name: name, description: desc);
+    // return created object so callers can refresh and show feedback
+    Navigator.pop(context, created);
   }
 
   @override

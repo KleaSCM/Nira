@@ -12,6 +12,7 @@ class StoryCardEditor extends StatefulWidget {
 class _StoryCardEditorState extends State<StoryCardEditor> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _content = TextEditingController();
+  final TextEditingController _world = TextEditingController();
 
   @override
   void dispose() {
@@ -24,9 +25,14 @@ class _StoryCardEditorState extends State<StoryCardEditor> {
     final title = _title.text.trim();
     if (title.isEmpty) return;
     final content = _content.text.trim();
-    final sc = RPStoryCard(title: title, content: content);
-    await RolePlayRepository().insertStoryCard(sc);
-    Navigator.pop(context, sc);
+    final world = _world.text.trim();
+    final sc = RPStoryCard(title: title, content: content, world: world);
+    final id = await RolePlayRepository().insertStoryCard(sc);
+    final created = RPStoryCard(id: id, title: title, content: content, world: world);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Story card saved')));
+    // allow user to see the toast briefly
+    await Future.delayed(const Duration(milliseconds: 350));
+    Navigator.pop(context, created);
   }
 
   @override
@@ -42,6 +48,8 @@ class _StoryCardEditorState extends State<StoryCardEditor> {
             TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title')),
             const SizedBox(height: 12),
             TextField(controller: _content, decoration: const InputDecoration(labelText: 'Content'), maxLines: 8),
+            const SizedBox(height: 12),
+            TextField(controller: _world, decoration: const InputDecoration(labelText: 'World (e.g. Hogwarts)'), maxLines: 1),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _save, child: const Text('Save')),
           ],

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'roleplay_models.dart';
 import 'roleplay_repository.dart';
+import 'RPChatScreen.dart';
 
 class SessionManager extends StatefulWidget {
-  const SessionManager({super.key});
+  final String? world;
+  const SessionManager({super.key, this.world});
 
   @override
   State<SessionManager> createState() => _SessionManagerState();
@@ -29,9 +31,23 @@ class _SessionManagerState extends State<SessionManager> {
   void _createSession() async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final name = 'Session ${_sessions.length + 1}';
-    final s = RPSession(name: name, metadata: '', createdAt: now);
-    await _repo.insertSession(s);
+    final metadata = widget.world != null && widget.world!.isNotEmpty ? '{"world":"${widget.world}"}' : '';
+    final s = RPSession(name: name, metadata: metadata, createdAt: now);
+    final id = await _repo.insertSession(s);
+    // create session object with returned id and navigate straight to chat
+    final created = RPSession(id: id, name: name, metadata: '', createdAt: now);
     await _load();
+    // open RP chat for the new session
+    if (!mounted) return;
+    final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => RPChatScreen(session: created)));
+    // show a small confirmation after returning from chat (or immediately)
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session created and opened')));
+    }
+  }
+
+  void _openSession(RPSession s) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => RPChatScreen(session: s)));
   }
 
   @override
@@ -49,7 +65,11 @@ class _SessionManagerState extends State<SessionManager> {
             Expanded(
               child: ListView.builder(
                 itemCount: _sessions.length,
-                itemBuilder: (context, i) => ListTile(title: Text(_sessions[i].name), trailing: const Icon(Icons.play_arrow)),
+                itemBuilder: (context, i) => ListTile(
+                  title: Text(_sessions[i].name),
+                  trailing: const Icon(Icons.play_arrow),
+                  onTap: () => _openSession(_sessions[i]),
+                ),
               ),
             ),
           ],
