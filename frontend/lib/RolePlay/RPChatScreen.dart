@@ -66,7 +66,7 @@ class _RPChatScreenState extends State<RPChatScreen> {
 
   void _startSession() {
     if (_started) return;
-    final payload = jsonEncode({
+    final payload = {
       'type': 'rp_start',
       'session_id': widget.session.id,
       'session_name': widget.session.name,
@@ -86,8 +86,8 @@ class _RPChatScreenState extends State<RPChatScreen> {
               'content': _selectedCard!.content,
               'world': _selectedCard!.world,
             },
-    });
-    _ws.sendMessage(payload);
+    };
+    _ws.sendRawJson(payload);
     setState(() {
       _messages.add({'sender': 'System', 'text': 'Session started: ${widget.session.name}'});
       _started = true;
@@ -101,12 +101,12 @@ class _RPChatScreenState extends State<RPChatScreen> {
     // ensure session started
     if (!_started) _startSession();
 
-    final payload = jsonEncode({
+    final payload = {
       'type': 'rp_message',
       'session_id': widget.session.id,
       'text': text,
-    });
-    _ws.sendMessage(payload);
+    };
+    _ws.sendRawJson(payload);
 
     setState(() {
       _messages.add({'sender': 'You', 'text': text});

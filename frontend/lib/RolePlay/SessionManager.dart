@@ -35,7 +35,7 @@ class _SessionManagerState extends State<SessionManager> {
     final s = RPSession(name: name, metadata: metadata, createdAt: now);
     final id = await _repo.insertSession(s);
     // create session object with returned id and navigate straight to chat
-    final created = RPSession(id: id, name: name, metadata: '', createdAt: now);
+    final created = RPSession(id: id, name: name, metadata: metadata, createdAt: now);
     await _load();
     // open RP chat for the new session
     if (!mounted) return;

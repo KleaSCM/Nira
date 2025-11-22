@@ -86,6 +86,21 @@ class WebSocketService {
 		Channel!.sink.add(jsonEncode(msg.toJson()));
 	}
 
+	/// Send a typed message (allows sending assistant/system/error types)
+	void sendTyped(MessageType type, String content) {
+		if (Channel == null || !IsConnected) return;
+		final msg = WSMessage(type: type, content: content);
+		Channel!.sink.add(jsonEncode(msg.toJson()));
+	}
+
+	/// Send a raw JSON-like object directly over the socket.
+	/// Use this when you need to send structured events (e.g. rp_start) that the backend
+	/// expects as top-level JSON objects.
+	void sendRawJson(Map<String, dynamic> map) {
+		if (Channel == null || !IsConnected) return;
+		Channel!.sink.add(jsonEncode(map));
+	}
+
 	Stream<WSMessage>? get messageStream {
 		if (Channel == null) {
 			return null;
