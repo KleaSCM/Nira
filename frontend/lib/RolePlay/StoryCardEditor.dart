@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'roleplay_models.dart';
+import 'roleplay_repository.dart';
 
 class StoryCardEditor extends StatefulWidget {
   const StoryCardEditor({super.key});
@@ -18,9 +20,13 @@ class _StoryCardEditorState extends State<StoryCardEditor> {
     super.dispose();
   }
 
-  void _save() {
-    // TODO: persist story card
-    Navigator.pop(context);
+  void _save() async {
+    final title = _title.text.trim();
+    if (title.isEmpty) return;
+    final content = _content.text.trim();
+    final sc = RPStoryCard(title: title, content: content);
+    await RolePlayRepository().insertStoryCard(sc);
+    Navigator.pop(context, sc);
   }
 
   @override

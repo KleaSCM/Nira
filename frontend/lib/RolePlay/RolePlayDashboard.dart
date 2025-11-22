@@ -4,6 +4,8 @@ import 'CharacterEditor.dart';
 import 'StoryCardEditor.dart';
 import 'SessionManager.dart';
 import 'RolePlaySettings.dart';
+import 'roleplay_models.dart';
+import 'roleplay_repository.dart';
 
 const Color rpBackground = Color(0xFFFFF0F5);
 const Color rpAccent = Color(0xFFFF69B4);
@@ -14,6 +16,8 @@ class RolePlayDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final repo = RolePlayRepository();
+
     return Scaffold(
       backgroundColor: rpBackground,
       appBar: AppBar(
@@ -54,11 +58,9 @@ class RolePlayDashboard extends StatelessWidget {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFFFF8DC)),
                   onPressed: () async {
-                    // Open RP Settings screen
                     final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const RolePlaySettings()));
-                    // result can be a Map<String, dynamic> with saved settings (persist as needed)
                     if (result != null) {
-                      // TODO: persist or apply the returned settings
+                      // TODO: persist or apply the returned settings (SharedPreferences/DB)
                     }
                   },
                   icon: const Icon(Icons.settings),
@@ -67,19 +69,38 @@ class RolePlayDashboard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Recent RP Sessions', style: GoogleFonts.quicksand(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    Text('No sessions yet. Create one using "Start Session".', style: GoogleFonts.quicksand(color: Colors.grey[700])),
-                  ],
-                ),
-              ),
+            FutureBuilder<List<dynamic>>(
+              // Let type inference handle the Future.wait generic parameter
+              future: Future.wait([
+                repo.getCharacters(),
+                repo.getStoryCards(),
+                repo.getSessions(),
+              ]),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const SizedBox(
+                    height: 64,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final chars = (snapshot.data![0] as List).length;
+                final cards = (snapshot.data![1] as List).length;
+                final sessions = (snapshot.data![2] as List).length;
+                return Card(
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Library', style: GoogleFonts.quicksand(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Text('Characters: $chars   Story Cards: $cards   Sessions: $sessions', style: GoogleFonts.quicksand(color: Colors.grey[700])),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),

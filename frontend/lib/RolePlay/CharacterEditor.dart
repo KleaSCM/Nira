@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'roleplay_models.dart';
+import 'roleplay_repository.dart';
 
 class CharacterEditor extends StatefulWidget {
   const CharacterEditor({super.key});
@@ -19,9 +21,13 @@ class _CharacterEditorState extends State<CharacterEditor> {
     super.dispose();
   }
 
-  void _save() {
-    // TODO: persist character to DB
-    Navigator.pop(context);
+  void _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    final desc = _desc.text.trim();
+    final c = RPCharacter(name: name, description: desc);
+    await RolePlayRepository().insertCharacter(c);
+    Navigator.pop(context, c);
   }
 
   @override

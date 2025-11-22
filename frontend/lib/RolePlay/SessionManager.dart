@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'roleplay_models.dart';
+import 'roleplay_repository.dart';
 
 class SessionManager extends StatefulWidget {
   const SessionManager({super.key});
@@ -8,11 +10,28 @@ class SessionManager extends StatefulWidget {
 }
 
 class _SessionManagerState extends State<SessionManager> {
-  final List<String> _sessions = [];
+  final List<RPSession> _sessions = [];
+  final RolePlayRepository _repo = RolePlayRepository();
 
-  void _createSession() {
-    // TODO: create and persist RP session
-    setState(() => _sessions.add('Session ${_sessions.length + 1}'));
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await _repo.getSessions();
+    setState(() => _sessions
+      ..clear()
+      ..addAll(s));
+  }
+
+  void _createSession() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final name = 'Session ${_sessions.length + 1}';
+    final s = RPSession(name: name, metadata: '', createdAt: now);
+    await _repo.insertSession(s);
+    await _load();
   }
 
   @override
@@ -30,7 +49,7 @@ class _SessionManagerState extends State<SessionManager> {
             Expanded(
               child: ListView.builder(
                 itemCount: _sessions.length,
-                itemBuilder: (context, i) => ListTile(title: Text(_sessions[i]), trailing: const Icon(Icons.play_arrow)),
+                itemBuilder: (context, i) => ListTile(title: Text(_sessions[i].name), trailing: const Icon(Icons.play_arrow)),
               ),
             ),
           ],
