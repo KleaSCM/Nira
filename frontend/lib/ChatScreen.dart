@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:nira_frontend/WebSocketService.dart';
+import 'package:nira_frontend/RolePlay/RolePlayDashboard.dart';
 
 const Color primaryColor = Color(0xFFFFB3D9);  // Bright pink
 const Color secondaryColor = Color(0xFFFFF0F5); // Lavender blush
@@ -232,300 +233,338 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: secondaryColor,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFFFF69B4),
-                Color(0xFFFF1493),
-                Color(0xFFE6B3FF),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  // New: chat body extracted so it can be used in TabBarView
+  Widget _buildChatBody() {
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFFFF0F5),
+                  Color(0xFFFFE4F0),
+                  Color(0xFFFFF8F0),
+                ],
+              ),
             ),
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              itemCount: Messages.length,
+              itemBuilder: (context, index) {
+                return _buildMessageBubble(Messages[index], index);
+              },
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             boxShadow: [
               BoxShadow(
-                color: Colors.pink.withOpacity(0.4),
+                color: Colors.pink.withOpacity(0.15),
                 blurRadius: 20,
-                offset: const Offset(0, 5),
+                offset: const Offset(0, -5),
               ),
             ],
           ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.pink.withOpacity(0.3),
-                          blurRadius: 8,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildToolButton(Icons.image_outlined, 'Photo', Colors.pink),
+                    _buildToolButton(Icons.attachment_outlined, 'File', Colors.purple),
+                    _buildToolButton(Icons.camera_alt_outlined, 'Camera', Colors.deepPurple),
+                    _buildToolButton(Icons.location_on_outlined, 'Location', Colors.pinkAccent),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFF69B4), Color(0xFFFF1493)],
                         ),
-                      ],
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.emoji_emotions,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                        onPressed: () {
+                          // TODO: Add emoji picker
+                        },
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.favorite,
-                      color: Color(0xFFFF1493),
-                      size: 28,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFFFFF0F5),
+                              Color(0xFFFFE4F0),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: Color(0xFFFFB3D9),
+                            width: 2,
+                          ),
+                        ),
+                        child: KeyboardListener(
+                          focusNode: FocusNode(),
+                          onKeyEvent: (KeyEvent event) {
+                            if (event is KeyDownEvent) {
+                              // Enter without Shift sends message
+                              if (event.logicalKey == LogicalKeyboardKey.enter &&
+                                  !HardwareKeyboard.instance.isShiftPressed) {
+                                _sendMessage();
+                              }
+                            }
+                          },
+                          child: TextField(
+                            controller: MessageController,
+                            focusNode: _textFocusNode,
+                            onChanged: (text) {
+                              setState(() {
+                                _isComposing = text.trim().isNotEmpty;
+                              });
+                            },
+                            style: GoogleFonts.quicksand(
+                              color: textColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Type something..',
+                              hintStyle: GoogleFonts.quicksand(
+                                color: Colors.pink[300],
+                                fontSize: 15,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            maxLines: 4,
+                            minLines: 1,
+                            textInputAction: TextInputAction.newline,
+                          ),
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, animation) {
+                        return ScaleTransition(
+                          scale: animation,
+                          child: RotationTransition(
+                            turns: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _isComposing
+                          ? Container(
+                              key: const ValueKey('send'),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFFFF69B4),
+                                    Color(0xFFFF1493),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.pink.withOpacity(0.5),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                                onPressed: _sendMessage,
+                              ),
+                            )
+                          : Container(
+                              key: const ValueKey('mic'),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFFE6B3FF), Color(0xFFDA70D6)],
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.mic_none_rounded,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                                onPressed: () {
+                                  // TODO: Add voice input
+                                },
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // New: simple RP view placeholder
+  Widget _buildRPView() {
+   return const RolePlayDashboard();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Wrap scaffold with DefaultTabController and move header+tabs into appBar area
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: secondaryColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(120),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFFFF69B4),
+                      Color(0xFFFF1493),
+                      Color(0xFFE6B3FF),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.pink.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
                       children: [
-                        Text(
-                          'NIRA Assistant ✨',
-                          style: GoogleFonts.pacifico(
-                            color: Colors.white,
-                            fontSize: 26,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.2),
-                                offset: const Offset(0, 2),
-                                blurRadius: 4,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.pink.withOpacity(0.3),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.favorite,
+                            color: Color(0xFFFF1493),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'NIRA Assistant ✨',
+                                style: GoogleFonts.pacifico(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      offset: const Offset(0, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                'lkhjsdf',
+                                style: GoogleFonts.quicksand(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        Text(
-                          'lkhjsdf',
-                          style: GoogleFonts.quicksand(
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.9),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.more_vert,
+                            color: Color(0xFFFF1493),
+                            size: 24,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.more_vert,
-                      color: Color(0xFFFF1493),
-                      size: 24,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFFFFF0F5),
-                    Color(0xFFFFE4F0),
-                    Color(0xFFFFF8F0),
+              // Tab bar below the header
+              Material(
+                color: Colors.transparent,
+                child: TabBar(
+                  indicatorColor: Colors.white,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  tabs: const [
+                    Tab(text: 'Chat', icon: Icon(Icons.chat_bubble_outline)),
+                    Tab(text: 'RP', icon: Icon(Icons.theater_comedy)),
                   ],
                 ),
               ),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                itemCount: Messages.length,
-                itemBuilder: (context, index) {
-                  return _buildMessageBubble(Messages[index], index);
-                },
-              ),
-            ),
+            ],
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.pink.withOpacity(0.15),
-                  blurRadius: 20,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildToolButton(Icons.image_outlined, 'Photo', Colors.pink),
-                      _buildToolButton(Icons.attachment_outlined, 'File', Colors.purple),
-                      _buildToolButton(Icons.camera_alt_outlined, 'Camera', Colors.deepPurple),
-                      _buildToolButton(Icons.location_on_outlined, 'Location', Colors.pinkAccent),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFFF69B4), Color(0xFFFF1493)],
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.emoji_emotions,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                          onPressed: () {
-                            // TODO: Add emoji picker
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Color(0xFFFFF0F5),
-                                Color(0xFFFFE4F0),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: Color(0xFFFFB3D9),
-                              width: 2,
-                            ),
-                          ),
-                          child: KeyboardListener(
-                            focusNode: FocusNode(),
-                            onKeyEvent: (KeyEvent event) {
-                              if (event is KeyDownEvent) {
-                                // Enter without Shift sends message
-                                if (event.logicalKey == LogicalKeyboardKey.enter &&
-                                    !HardwareKeyboard.instance.isShiftPressed) {
-                                  _sendMessage();
-                                }
-                              }
-                            },
-                            child: TextField(
-                              controller: MessageController,
-                              focusNode: _textFocusNode,
-                              onChanged: (text) {
-                                setState(() {
-                                  _isComposing = text.trim().isNotEmpty;
-                                });
-                              },
-                              style: GoogleFonts.quicksand(
-                                color: textColor,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Type something..',
-                                hintStyle: GoogleFonts.quicksand(
-                                  color: Colors.pink[300],
-                                  fontSize: 15,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              maxLines: 4,
-                              minLines: 1,
-                              textInputAction: TextInputAction.newline,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        transitionBuilder: (child, animation) {
-                          return ScaleTransition(
-                            scale: animation,
-                            child: RotationTransition(
-                              turns: animation,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: _isComposing
-                            ? Container(
-                                key: const ValueKey('send'),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xFFFF69B4),
-                                      Color(0xFFFF1493),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.pink.withOpacity(0.5),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.send_rounded,
-                                    color: Colors.white,
-                                    size: 26,
-                                  ),
-                                  onPressed: _sendMessage,
-                                ),
-                              )
-                            : Container(
-                                key: const ValueKey('mic'),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [Color(0xFFE6B3FF), Color(0xFFDA70D6)],
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.mic_none_rounded,
-                                    color: Colors.white,
-                                    size: 26,
-                                  ),
-                                  onPressed: () {
-                                    // TODO: Add voice input
-                                  },
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
+        // TabBarView switches between chat and RP UI
+        body: TabBarView(
+          children: [
+            _buildChatBody(),
+            _buildRPView(),
+          ],
+        ),
       ),
     );
   }
