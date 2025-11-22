@@ -160,6 +160,41 @@ func (cs *ConversationStore) GetMessages(conversationID int64) ([]*Message, erro
 	return messages, nil
 }
 
+func (cs *ConversationStore) DeleteConversation(id int64) error {
+	tx, err := cs.DB.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete all messages in the conversation first
+	_, err = tx.Exec("DELETE FROM messages WHERE conversation_id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete messages: %w", err)
+	}
+
+	// Delete the conversation
+	result, err := tx.Exec("DELETE FROM conversations WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete conversation: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("conversation with ID %d not found", id)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (cs *ConversationStore) GetCurrentConversation() (int64, error) {
 	var id int64
 	err := cs.DB.DB.QueryRow(
