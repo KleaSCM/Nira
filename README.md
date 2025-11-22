@@ -29,10 +29,6 @@ Nira/
 └── Tests/            # Test files
 ```
 
-## Development
-
-See `Scope.txt` for detailed project requirements and `StyleGuide.txt` for coding standards.
-
 ## Author
 
 Author: KleaSCM  

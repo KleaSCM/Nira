@@ -15,6 +15,7 @@ package main
 
 import (
 	"log"
+	"nira/memory"
 	"nira/tools"
 	"os"
 )
@@ -34,13 +35,24 @@ func main() {
 
 	logger := NewLogger(LogLevelInfo)
 
+	db, err := memory.NewDatabase(config.DatabasePath)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer db.Close()
+
+	memManager, err := memory.NewManager(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize memory manager: %v", err)
+	}
+
 	ollamaClient := NewOllamaClient(config.OllamaEndpoint, config.DefaultModel)
 
 	toolRegistry := tools.NewRegistry()
 	fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
 	toolRegistry.Register(fileReadTool)
 
-	server := NewServer(config.WebSocketPort, ollamaClient, toolRegistry, logger)
+	server := NewServer(config.WebSocketPort, ollamaClient, toolRegistry, logger, memManager)
 
 	log.Println("Starting NIRA backend...")
 	if err := server.Start(); err != nil {

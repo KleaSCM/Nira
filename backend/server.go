@@ -15,6 +15,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"nira/memory"
 	"nira/tools"
 	"time"
 
@@ -33,10 +34,11 @@ type Server struct {
 	ToolRegistry *tools.Registry
 	ToolHandler  *ToolHandler
 	Logger       *Logger
+	Memory       *memory.Manager
 	Conversation []ChatMessage
 }
 
-func NewServer(port int, ollama *OllamaClient, registry *tools.Registry, logger *Logger) *Server {
+func NewServer(port int, ollama *OllamaClient, registry *tools.Registry, logger *Logger, mem *memory.Manager) *Server {
 	toolHandler := NewToolHandler(registry, logger)
 	return &Server{
 		Port:         port,
@@ -44,6 +46,7 @@ func NewServer(port int, ollama *OllamaClient, registry *tools.Registry, logger 
 		ToolRegistry: registry,
 		ToolHandler:  toolHandler,
 		Logger:       logger,
+		Memory:       mem,
 		Conversation: []ChatMessage{},
 	}
 }
@@ -65,6 +68,21 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	s.Logger.LogWebSocketEvent("connection", "established")
 
+	// Load recent conversation history
+	recentMessages, err := s.Memory.LoadRecentMessages(50)
+	if err != nil {
+		s.Logger.Warn("Failed to load recent messages: %v", err)
+	} else {
+		s.Conversation = []ChatMessage{}
+		for _, msg := range recentMessages {
+			s.Conversation = append(s.Conversation, ChatMessage{
+				Role:    msg.Role,
+				Content: msg.Content,
+			})
+		}
+		s.Logger.Info("Loaded %d messages from history", len(recentMessages))
+	}
+
 	for {
 		var msg WSMessage
 		if err := conn.ReadJSON(&msg); err != nil {
@@ -84,6 +102,10 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, content string) {
 		Content: content,
 	}
 	s.Conversation = append(s.Conversation, userMsg)
+
+	if err := s.Memory.SaveMessage("user", content, ""); err != nil {
+		s.Logger.Warn("Failed to save user message: %v", err)
+	}
 
 	systemPrompt := s.buildSystemPrompt()
 	systemMsg := ChatMessage{
@@ -128,6 +150,10 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, content string) {
 				Content: assistantContent,
 			}
 			s.Conversation = append(s.Conversation, assistantMsg)
+
+			if err := s.Memory.SaveMessage("assistant", assistantContent, ""); err != nil {
+				s.Logger.Warn("Failed to save assistant message: %v", err)
+			}
 
 			doneMsg := WSMessage{
 				Type:    MessageTypeAssistant,
