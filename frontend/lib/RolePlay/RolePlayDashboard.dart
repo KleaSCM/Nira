@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'CharacterEditor.dart';
 import 'StoryCardEditor.dart';
 import 'SessionManager.dart';
+import 'RolePlaySettings.dart';
 
 const Color rpBackground = Color(0xFFFFF0F5);
 const Color rpAccent = Color(0xFFFF69B4);
@@ -52,8 +53,13 @@ class RolePlayDashboard extends StatelessWidget {
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFFFF8DC)),
-                  onPressed: () {
-                    // TODO: RP settings screen
+                  onPressed: () async {
+                    // Open RP Settings screen
+                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const RolePlaySettings()));
+                    // result can be a Map<String, dynamic> with saved settings (persist as needed)
+                    if (result != null) {
+                      // TODO: persist or apply the returned settings
+                    }
                   },
                   icon: const Icon(Icons.settings),
                   label: const Text('RP Settings'),
