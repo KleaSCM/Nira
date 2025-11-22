@@ -47,6 +47,16 @@ class _RPChatScreenState extends State<RPChatScreen> {
       _characters = chars;
       _cards = cards;
     });
+
+    // Initialize selected character/card from session if present
+    if (widget.session.characterId != null) {
+      final match = chars.firstWhere((c) => c.id == widget.session.characterId, orElse: () => RPCharacter(id: null, name: '', description: ''));
+      if (match.id != null && match.id! > 0) setState(() => _selectedCharacter = match);
+    }
+    if (widget.session.storyCardId != null) {
+      final match = cards.firstWhere((c) => c.id == widget.session.storyCardId, orElse: () => RPStoryCard(id: null, title: '', content: '', world: ''));
+      if (match.id != null && match.id! > 0) setState(() => _selectedCard = match);
+    }
   }
 
   @override
@@ -123,8 +133,15 @@ class _RPChatScreenState extends State<RPChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.session.name, style: GoogleFonts.quicksand()),
-            if (widget.session.metadata.isNotEmpty)
-              Text(widget.session.metadata, style: GoogleFonts.quicksand(fontSize: 12)),
+            if (widget.session.world != null && widget.session.world!.isNotEmpty)
+              Text('World: ${widget.session.world}', style: GoogleFonts.quicksand(fontSize: 12)),
+            if (widget.session.rules != null && widget.session.rules!.isNotEmpty)
+              Text('Rules: ${widget.session.rules}', style: GoogleFonts.quicksand(fontSize: 12)),
+            if (_selectedCharacter != null || _selectedCard != null)
+              Text(
+                '${_selectedCharacter != null ? 'Char: ${_selectedCharacter!.name}' : ''}${_selectedCharacter != null && _selectedCard != null ? ' · ' : ''}${_selectedCard != null ? 'Card: ${_selectedCard!.title}' : ''}',
+                style: GoogleFonts.quicksand(fontSize: 12),
+              ),
           ],
         ),
         actions: [

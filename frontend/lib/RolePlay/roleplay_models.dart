@@ -44,27 +44,39 @@ class RPStoryCard {
 class RPSession {
   int? id;
   String name;
-  String metadata;
+  String world;
+  int? characterId;
+  int? storyCardId;
+  String rules;
   int createdAt;
 
   RPSession({
     this.id,
     required this.name,
-    this.metadata = '',
+    this.world = '',
+    this.characterId,
+    this.storyCardId,
+    this.rules = '',
     required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
         'name': name,
-        'metadata': metadata,
+        'world': world,
+        'character_id': characterId,
+        'story_card_id': storyCardId,
+        'rules': rules,
         'created_at': createdAt,
       };
 
   factory RPSession.fromMap(Map<String, dynamic> m) => RPSession(
         id: m['id'] as int?,
         name: m['name'] as String,
-        metadata: (m['metadata'] as String?) ?? '',
+        world: (m['world'] as String?) ?? '',
+        characterId: m['character_id'] as int?,
+        storyCardId: m['story_card_id'] as int?,
+        rules: (m['rules'] as String?) ?? '',
         createdAt: m['created_at'] as int,
       );
 }

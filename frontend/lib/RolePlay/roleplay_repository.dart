@@ -21,8 +21,8 @@ class RolePlayRepository {
   Future<Database> _initDb() async {
     final databasesPath = await getDatabasesPath();
     final path = join(databasesPath, 'nira_roleplay.db');
-    // bump DB version to 2 to add 'world' column for story_cards
-    return await openDatabase(path, version: 2, onCreate: (db, ver) async {
+    // bump DB version to 3 to add session linkage columns
+    return await openDatabase(path, version: 3, onCreate: (db, ver) async {
       await db.execute('''
         CREATE TABLE characters (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +42,10 @@ class RolePlayRepository {
         CREATE TABLE sessions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
-          metadata TEXT,
+          world TEXT,
+          character_id INTEGER,
+          story_card_id INTEGER,
+          rules TEXT,
           created_at INTEGER NOT NULL
         )
       ''');
@@ -51,9 +54,16 @@ class RolePlayRepository {
         // add world column to story_cards if upgrading from v1
         try {
           await db.execute("ALTER TABLE story_cards ADD COLUMN world TEXT DEFAULT ''");
-        } catch (_) {
-          // ignore if column already exists
-        }
+        } catch (_) {}
+      }
+      if (oldVer < 3) {
+        // add session linkage columns
+        try {
+          await db.execute("ALTER TABLE sessions ADD COLUMN world TEXT");
+          await db.execute("ALTER TABLE sessions ADD COLUMN character_id INTEGER");
+          await db.execute("ALTER TABLE sessions ADD COLUMN story_card_id INTEGER");
+          await db.execute("ALTER TABLE sessions ADD COLUMN rules TEXT");
+        } catch (_) {}
       }
     });
   }
