@@ -21,13 +21,14 @@ class RolePlayRepository {
   Future<Database> _initDb() async {
     final databasesPath = await getDatabasesPath();
     final path = join(databasesPath, 'nira_roleplay.db');
-    // bump DB version to 5 to add worlds table and session linkage
-    return await openDatabase(path, version: 5, onCreate: (db, ver) async {
+    // bump DB version to 6 to add worlds table and session linkage
+      return await openDatabase(path, version: 6, onCreate: (db, ver) async {
       await db.execute('''
         CREATE TABLE characters (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
-          description TEXT NOT NULL
+          description TEXT NOT NULL,
+          world TEXT DEFAULT ''
         )
       ''');
       await db.execute('''
@@ -90,6 +91,12 @@ class RolePlayRepository {
           ''');
         } catch (_) {}
       }
+        if (oldVer < 6) {
+          // add world column to characters
+          try {
+            await db.execute("ALTER TABLE characters ADD COLUMN world TEXT DEFAULT ''");
+          } catch (_) {}
+        }
     });
   }
 

@@ -5,7 +5,8 @@ import 'roleplay_repository.dart';
 import 'CharacterEditor.dart';
 
 class CharacterList extends StatefulWidget {
-  const CharacterList({super.key});
+  final String? world;
+  const CharacterList({super.key, this.world});
 
   @override
   State<CharacterList> createState() => _CharacterListState();
@@ -23,13 +24,14 @@ class _CharacterListState extends State<CharacterList> {
 
   Future<void> _load() async {
     final list = await _repo.getCharacters();
-    setState(() => _chars = list);
+    final filtered = widget.world == null || widget.world!.isEmpty ? list : list.where((c) => c.world == widget.world).toList();
+    setState(() => _chars = filtered);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Characters')),
+      appBar: AppBar(title: Text(widget.world?.isNotEmpty == true ? 'Characters: ${widget.world}' : 'Characters')),
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

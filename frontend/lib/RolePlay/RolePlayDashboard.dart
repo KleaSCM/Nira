@@ -148,7 +148,7 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: rpAccent),
                   onPressed: () async {
-                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CharacterEditor()));
+                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => CharacterEditor(world: selectedWorld.isEmpty ? null : selectedWorld)));
                     if (result != null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Character saved')));
                       _refresh();
@@ -160,7 +160,7 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFFFB3D9)),
                   onPressed: () async {
-                    final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => CharacterList()));
+                    final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => CharacterList(world: selectedWorld.isEmpty ? null : selectedWorld)));
                     if (res != null) {
                       // user picked a character from list
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Character selected')));
@@ -173,7 +173,7 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFE6B3FF)),
                   onPressed: () async {
-                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const StoryCardEditor()));
+                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => StoryCardEditor(world: selectedWorld.isEmpty ? null : selectedWorld)));
                     if (result != null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Story card saved')));
                       _refresh();
@@ -228,9 +228,19 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                     child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                final chars = (snapshot.data![0] as List).length;
-                final cards = (snapshot.data![1] as List).length;
-                final sessions = (snapshot.data![2] as List).length;
+                final allChars = (snapshot.data![0] as List).cast();
+                final allCards = (snapshot.data![1] as List).cast();
+                final allSessions = (snapshot.data![2] as List).cast();
+
+                final chars = selectedWorld.isEmpty
+                  ? allChars.length
+                  : allChars.where((c) => (c.world ?? '') == selectedWorld).length;
+                final cards = selectedWorld.isEmpty
+                  ? allCards.length
+                  : allCards.where((c) => (c.world ?? '') == selectedWorld).length;
+                final sessions = selectedWorld.isEmpty
+                  ? allSessions.length
+                  : allSessions.where((s) => (s.world ?? '') == selectedWorld).length;
                 return Card(
                   elevation: 2,
                   child: Padding(

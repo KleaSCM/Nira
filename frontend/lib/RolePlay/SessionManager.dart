@@ -43,20 +43,28 @@ class _SessionManagerState extends State<SessionManager> {
     if (widget.world != null && widget.world!.isNotEmpty) {
       final matches = cards.where((c) => c.world == widget.world).toList();
       if (matches.isNotEmpty) setState(() => _selectedCards = matches);
-    }
 
-    // If there's exactly one character in the library, preselect it as a participant and player
-    if (chars.length == 1) setState(() {
-      _selectedCharacters = chars;
-      _playerCharacter = chars.first;
-    });
+      // preselect characters that belong to the world
+      final charMatches = chars.where((c) => (c.world ?? '') == widget.world).toList();
+      if (charMatches.isNotEmpty) setState(() {
+        _selectedCharacters = charMatches;
+        _playerCharacter = charMatches.first;
+      });
+    } else {
+      // If there's exactly one character in the library, preselect it as a participant and player
+      if (chars.length == 1) setState(() {
+        _selectedCharacters = chars;
+        _playerCharacter = chars.first;
+      });
+    }
   }
 
   Future<void> _load() async {
     final s = await _repo.getSessions();
+    final filtered = widget.world == null || widget.world!.isEmpty ? s : s.where((ss) => (ss.world ?? '') == widget.world).toList();
     setState(() => _sessions
       ..clear()
-      ..addAll(s));
+      ..addAll(filtered));
   }
   Future<void> _createSession() async {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -168,24 +176,27 @@ class _SessionManagerState extends State<SessionManager> {
                       // multi-select characters via dialog
                       final chosenIds = await showDialog<List<int>>(context: context, builder: (c) {
                         final selected = Set<int>.from(_selectedCharacters.map((e) => e.id!).whereType<int>());
-                        return StatefulBuilder(builder: (ctx, setSt) {
-                          return AlertDialog(
-                            title: const Text('Select Characters'),
-                            content: SizedBox(
-                              width: double.maxFinite,
-                              child: ListView(
-                                shrinkWrap: true,
-                                children: _allCharacters.map((ch) {
-                                  final id = ch.id!;
-                                  return CheckboxListTile(
-                                    value: selected.contains(id),
-                                    title: Text(ch.name),
-                                    subtitle: Text(ch.description, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    onChanged: (v) => setSt(() => v == true ? selected.add(id) : selected.remove(id)),
-                                  );
-                                }).toList(),
+                          final candidates = widget.world != null && widget.world!.isNotEmpty
+                              ? _allCharacters.where((c) => (c.world ?? '') == widget.world).toList()
+                              : _allCharacters;
+                          return StatefulBuilder(builder: (ctx, setSt) {
+                            return AlertDialog(
+                              title: const Text('Select Characters'),
+                              content: SizedBox(
+                                width: double.maxFinite,
+                                child: ListView(
+                                  shrinkWrap: true,
+                                  children: candidates.map((ch) {
+                                    final id = ch.id!;
+                                    return CheckboxListTile(
+                                      value: selected.contains(id),
+                                      title: Text(ch.name),
+                                      subtitle: Text(ch.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      onChanged: (v) => setSt(() => v == true ? selected.add(id) : selected.remove(id)),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
-                            ),
                             actions: [
                               TextButton(onPressed: () => Navigator.of(c).pop(null), child: const Text('Cancel')),
                               ElevatedButton(onPressed: () => Navigator.of(c).pop(selected.toList()), child: const Text('OK')),

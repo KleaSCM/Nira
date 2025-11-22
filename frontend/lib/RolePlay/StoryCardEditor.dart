@@ -3,7 +3,8 @@ import 'roleplay_models.dart';
 import 'roleplay_repository.dart';
 
 class StoryCardEditor extends StatefulWidget {
-  const StoryCardEditor({super.key});
+  final String? world;
+  const StoryCardEditor({super.key, this.world});
 
   @override
   State<StoryCardEditor> createState() => _StoryCardEditorState();
@@ -13,6 +14,12 @@ class _StoryCardEditorState extends State<StoryCardEditor> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _content = TextEditingController();
   final TextEditingController _world = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _world.text = widget.world ?? '';
+  }
 
   @override
   void dispose() {

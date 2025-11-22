@@ -4,19 +4,22 @@ class RPCharacter {
   int? id;
   String name;
   String description;
+  String world;
 
-  RPCharacter({this.id, required this.name, required this.description});
+  RPCharacter({this.id, required this.name, required this.description, this.world = ''});
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
         'name': name,
         'description': description,
+        'world': world,
       };
 
   factory RPCharacter.fromMap(Map<String, dynamic> m) => RPCharacter(
         id: m['id'] as int?,
         name: m['name'] as String,
         description: m['description'] as String,
+        world: (m['world'] as String?) ?? '',
       );
 }
 
