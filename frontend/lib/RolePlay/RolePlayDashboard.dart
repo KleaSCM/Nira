@@ -28,18 +28,27 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
 
   String selectedWorld = ''; // empty = all
   Future<List<String>>? _worldsFuture;
+  Future<List<RPSession>>? _sessionsFuture;
 
   @override
   void initState() {
     super.initState();
     _worldsFuture = repo.getWorlds();
     _loadPrefs();
+    _loadSessionsFuture();
   }
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       selectedWorld = prefs.getString('rp_selected_world') ?? '';
+    });
+  }
+
+  void _loadSessionsFuture() {
+    _sessionsFuture = repo.getSessions().then((list) {
+      if (selectedWorld.isEmpty) return list;
+      return list.where((s) => (s.world ?? '') == selectedWorld).toList();
     });
   }
 
@@ -78,6 +87,8 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                           });
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.setString('rp_selected_world', selectedWorld);
+                          // refresh session list for the selected world
+                          setState(() => _loadSessionsFuture());
                         },
                         decoration: const InputDecoration(labelText: 'Active World'),
                       );
@@ -92,6 +103,48 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
               spacing: 12,
               runSpacing: 12,
               children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFEFD5)),
+                  onPressed: () async {
+                    final nameCtrl = TextEditingController();
+                    final descCtrl = TextEditingController();
+                    final res = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text('Create World'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'World name')),
+                            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optional)')),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Cancel')),
+                          ElevatedButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('Create')),
+                        ],
+                      ),
+                    );
+                    if (res == true && nameCtrl.text.trim().isNotEmpty) {
+                      final id = await repo.insertWorld(RPWorld(name: nameCtrl.text.trim(), description: descCtrl.text.trim()));
+                      if (id == -1) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('World already exists')));
+                      } else {
+                        // refresh worlds and select the new one
+                        setState(() {
+                          _worldsFuture = repo.getWorlds();
+                          selectedWorld = nameCtrl.text.trim();
+                          _loadSessionsFuture();
+                        });
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString('rp_selected_world', selectedWorld);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('World created')));
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.public),
+                  label: const Text('New World'),
+                ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: rpAccent),
                   onPressed: () async {
@@ -190,6 +243,30 @@ class _RolePlayDashboardState extends State<RolePlayDashboard> {
                         Text('Characters: $chars   Story Cards: $cards   Sessions: $sessions', style: GoogleFonts.quicksand(color: Colors.grey[700])),
                       ],
                     ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Text('World Sessions', style: GoogleFonts.quicksand(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            FutureBuilder<List<RPSession>>(
+              future: _sessionsFuture,
+              builder: (context, snap) {
+                if (!snap.hasData) return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
+                final sessions = snap.data!;
+                if (sessions.isEmpty) return Text(selectedWorld.isEmpty ? 'No sessions yet.' : 'No sessions for "$selectedWorld"');
+                return Card(
+                  elevation: 1,
+                  child: Column(
+                    children: sessions.map((s) {
+                      return ListTile(
+                        title: Text(s.name),
+                        subtitle: Text(s.world ?? ''),
+                        trailing: const Icon(Icons.play_arrow),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SessionManager(world: s.world))),
+                      );
+                    }).toList(),
                   ),
                 );
               },

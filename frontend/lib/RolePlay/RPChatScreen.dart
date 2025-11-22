@@ -47,14 +47,21 @@ class _RPChatScreenState extends State<RPChatScreen> {
       _characters = chars;
       _cards = cards;
     });
-
     // Initialize selected character/card from session if present
-    if (widget.session.characterId != null) {
-      final match = chars.firstWhere((c) => c.id == widget.session.characterId, orElse: () => RPCharacter(id: null, name: '', description: ''));
-      if (match.id != null && match.id! > 0) setState(() => _selectedCharacter = match);
+    if (widget.session.characterIds.isNotEmpty) {
+      // pick playerCharacterId if present, else first in list
+      if (widget.session.playerCharacterId != null) {
+        final match = chars.firstWhere((c) => c.id == widget.session.playerCharacterId, orElse: () => RPCharacter(id: null, name: '', description: ''));
+        if (match.id != null && match.id! > 0) setState(() => _selectedCharacter = match);
+      } else {
+        final firstId = widget.session.characterIds.first;
+        final match = chars.firstWhere((c) => c.id == firstId, orElse: () => RPCharacter(id: null, name: '', description: ''));
+        if (match.id != null && match.id! > 0) setState(() => _selectedCharacter = match);
+      }
     }
-    if (widget.session.storyCardId != null) {
-      final match = cards.firstWhere((c) => c.id == widget.session.storyCardId, orElse: () => RPStoryCard(id: null, title: '', content: '', world: ''));
+    if (widget.session.storyCardIds.isNotEmpty) {
+      final firstId = widget.session.storyCardIds.first;
+      final match = cards.firstWhere((c) => c.id == firstId, orElse: () => RPStoryCard(id: null, title: '', content: '', world: ''));
       if (match.id != null && match.id! > 0) setState(() => _selectedCard = match);
     }
   }
@@ -81,21 +88,18 @@ class _RPChatScreenState extends State<RPChatScreen> {
       'session_id': widget.session.id,
       'session_name': widget.session.name,
       'created_at': widget.session.createdAt,
-      'character': _selectedCharacter == null
+      'player_character': widget.session.playerCharacterId == null
           ? null
-          : {
-              'id': _selectedCharacter!.id,
-              'name': _selectedCharacter!.name,
-              'description': _selectedCharacter!.description,
-            },
-      'story_card': _selectedCard == null
-          ? null
-          : {
-              'id': _selectedCard!.id,
-              'title': _selectedCard!.title,
-              'content': _selectedCard!.content,
-              'world': _selectedCard!.world,
-            },
+          : _characters.firstWhere((c) => c.id == widget.session.playerCharacterId, orElse: () => RPCharacter(id: null, name: '', description: ''))
+              .toMap(),
+      'characters': widget.session.characterIds.map((id) {
+        final c = _characters.firstWhere((x) => x.id == id, orElse: () => RPCharacter(id: null, name: '', description: ''));
+        return c.id == null ? null : c.toMap();
+      }).where((e) => e != null).toList(),
+      'story_cards': widget.session.storyCardIds.map((id) {
+        final s = _cards.firstWhere((x) => x.id == id, orElse: () => RPStoryCard(id: null, title: '', content: '', world: ''));
+        return s.id == null ? null : s.toMap();
+      }).where((e) => e != null).toList(),
     };
     _ws.sendRawJson(payload);
     setState(() {
@@ -169,9 +173,13 @@ class _RPChatScreenState extends State<RPChatScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6.0),
                     child: ActionChip(
-                      label: Text(c.name),
+                      label: Text(widget.session.characterIds.contains(c.id)
+                          ? (widget.session.playerCharacterId == c.id ? '${c.name} (PC)' : '${c.name} (NPC)')
+                          : c.name),
                       onPressed: () => setState(() => _selectedCharacter = c),
-                      backgroundColor: _selectedCharacter?.id == c.id ? Colors.pink[100] : null,
+                      backgroundColor: _selectedCharacter?.id == c.id
+                          ? Colors.pink[100]
+                          : (widget.session.characterIds.contains(c.id) ? Colors.pink[50] : null),
                     ),
                   ),
                 const SizedBox(width: 16),
@@ -180,9 +188,11 @@ class _RPChatScreenState extends State<RPChatScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6.0),
                     child: ActionChip(
-                      label: Text(card.title),
+                      label: Text(widget.session.storyCardIds.contains(card.id) ? '${card.title} (In Session)' : card.title),
                       onPressed: () => setState(() => _selectedCard = card),
-                      backgroundColor: _selectedCard?.id == card.id ? Colors.purple[100] : null,
+                      backgroundColor: _selectedCard?.id == card.id
+                          ? Colors.purple[100]
+                          : (widget.session.storyCardIds.contains(card.id) ? Colors.purple[50] : null),
                     ),
                   ),
               ],

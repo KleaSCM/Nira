@@ -16,8 +16,9 @@ class SessionManager extends StatefulWidget {
 class _SessionManagerState extends State<SessionManager> {
   final List<RPSession> _sessions = [];
   final RolePlayRepository _repo = RolePlayRepository();
-  RPCharacter? _selectedCharacter;
-  RPStoryCard? _selectedCard;
+  List<RPCharacter> _selectedCharacters = [];
+  List<RPStoryCard> _selectedCards = [];
+  RPCharacter? _playerCharacter;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _rulesController = TextEditingController();
   List<RPCharacter> _allCharacters = [];
@@ -38,16 +39,17 @@ class _SessionManagerState extends State<SessionManager> {
       _allCards = cards;
     });
 
-    // Preselect story card matching the provided world, if any
+    // Preselect story cards matching the provided world, if any
     if (widget.world != null && widget.world!.isNotEmpty) {
-      final match = cards.firstWhere((c) => c.world == widget.world, orElse: () => RPStoryCard(id: null, title: '', content: '', world: ''));
-      if (match.id != null && match.id! > 0) {
-        setState(() => _selectedCard = match);
-      }
+      final matches = cards.where((c) => c.world == widget.world).toList();
+      if (matches.isNotEmpty) setState(() => _selectedCards = matches);
     }
 
-    // If there's exactly one character in the library, preselect it
-    if (chars.length == 1) setState(() => _selectedCharacter = chars.first);
+    // If there's exactly one character in the library, preselect it as a participant and player
+    if (chars.length == 1) setState(() {
+      _selectedCharacters = chars;
+      _playerCharacter = chars.first;
+    });
   }
 
   Future<void> _load() async {
@@ -59,19 +61,29 @@ class _SessionManagerState extends State<SessionManager> {
   Future<void> _createSession() async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final name = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Session ${_sessions.length + 1}';
-    final world = widget.world ?? _selectedCard?.world ?? '';
+    final world = widget.world ?? (_selectedCards.isNotEmpty ? _selectedCards.first.world : '') ?? '';
     final rules = _rulesController.text.trim();
     final s = RPSession(
       name: name,
       world: world,
-      characterId: _selectedCharacter?.id,
-      storyCardId: _selectedCard?.id,
+      playerCharacterId: _playerCharacter?.id,
+      characterIds: _selectedCharacters.map((c) => c.id!).toList(),
+      storyCardIds: _selectedCards.map((c) => c.id!).toList(),
       rules: rules,
       createdAt: now,
     );
     final id = await _repo.insertSession(s);
     // create session object with returned id and navigate straight to chat
-    final created = RPSession(id: id, name: name, world: world, characterId: _selectedCharacter?.id, storyCardId: _selectedCard?.id, rules: rules, createdAt: now);
+    final created = RPSession(
+      id: id,
+      name: name,
+      world: world,
+      playerCharacterId: _playerCharacter?.id,
+      characterIds: _selectedCharacters.map((c) => c.id!).toList(),
+      storyCardIds: _selectedCards.map((c) => c.id!).toList(),
+      rules: rules,
+      createdAt: now,
+    );
     await _load();
     // open RP chat for the new session
     if (!mounted) return;
@@ -85,9 +97,9 @@ class _SessionManagerState extends State<SessionManager> {
   Future<void> _onStartPressed() async {
     // basic validation
     final name = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Session ${_sessions.length + 1}';
-    final world = widget.world ?? _selectedCard?.world ?? '';
-    final charName = _selectedCharacter?.name ?? 'None';
-    final cardTitle = _selectedCard?.title ?? 'None';
+    final world = widget.world ?? (_selectedCards.isNotEmpty ? _selectedCards.first.world : '') ?? '';
+    final charName = _playerCharacter?.name ?? (_selectedCharacters.isNotEmpty ? _selectedCharacters.first.name : 'None');
+    final cardTitle = _selectedCards.isNotEmpty ? _selectedCards.map((c) => c.title).join(', ') : 'None';
     final rules = _rulesController.text.trim();
 
     final confirmed = await showDialog<bool>(
@@ -153,33 +165,116 @@ class _SessionManagerState extends State<SessionManager> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CharacterList()));
-                      if (res != null && res is RPCharacter) {
-                        setState(() => _selectedCharacter = res);
+                      // multi-select characters via dialog
+                      final chosenIds = await showDialog<List<int>>(context: context, builder: (c) {
+                        final selected = Set<int>.from(_selectedCharacters.map((e) => e.id!).whereType<int>());
+                        return StatefulBuilder(builder: (ctx, setSt) {
+                          return AlertDialog(
+                            title: const Text('Select Characters'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: ListView(
+                                shrinkWrap: true,
+                                children: _allCharacters.map((ch) {
+                                  final id = ch.id!;
+                                  return CheckboxListTile(
+                                    value: selected.contains(id),
+                                    title: Text(ch.name),
+                                    subtitle: Text(ch.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    onChanged: (v) => setSt(() => v == true ? selected.add(id) : selected.remove(id)),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.of(c).pop(null), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.of(c).pop(selected.toList()), child: const Text('OK')),
+                            ],
+                          );
+                        });
+                      });
+                      if (chosenIds != null) {
+                        setState(() {
+                          _selectedCharacters = _allCharacters.where((c) => c.id != null && chosenIds.contains(c.id)).toList();
+                          if (_playerCharacter == null || !_selectedCharacters.any((c) => c.id == _playerCharacter?.id)) {
+                            _playerCharacter = _selectedCharacters.isNotEmpty ? _selectedCharacters.first : null;
+                          }
+                        });
                       }
                     },
                     icon: const Icon(Icons.person),
-                    label: const Text('Pick Character'),
+                    label: const Text('Pick Characters'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => StoryCardList(world: widget.world)));
-                      if (res != null && res is RPStoryCard) {
-                        setState(() => _selectedCard = res);
+                      final chosenIds = await showDialog<List<int>>(context: context, builder: (c) {
+                        final filtered = widget.world != null && widget.world!.isNotEmpty ? _allCards.where((a) => a.world == widget.world).toList() : _allCards;
+                        final selected = Set<int>.from(_selectedCards.map((e) => e.id!).whereType<int>());
+                        return StatefulBuilder(builder: (ctx, setSt) {
+                          return AlertDialog(
+                            title: const Text('Select Story Cards'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: ListView(
+                                shrinkWrap: true,
+                                children: filtered.map((card) {
+                                  final id = card.id!;
+                                  return CheckboxListTile(
+                                    value: selected.contains(id),
+                                    title: Text(card.title),
+                                    subtitle: Text(card.world.isNotEmpty ? card.world : 'No world'),
+                                    onChanged: (v) => setSt(() => v == true ? selected.add(id) : selected.remove(id)),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.of(c).pop(null), child: const Text('Cancel')),
+                              ElevatedButton(onPressed: () => Navigator.of(c).pop(selected.toList()), child: const Text('OK')),
+                            ],
+                          );
+                        });
+                      });
+                      if (chosenIds != null) {
+                        setState(() => _selectedCards = _allCards.where((c) => c.id != null && chosenIds.contains(c.id)).toList());
                       }
                     },
                     icon: const Icon(Icons.menu_book),
-                    label: const Text('Pick Story Card'),
+                    label: const Text('Pick Story Cards'),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (_selectedCharacter != null) ListTile(title: Text('Character: ${_selectedCharacter!.name}'), subtitle: Text(_selectedCharacter!.description)),
-            if (_selectedCard != null) ListTile(title: Text('Story Card: ${_selectedCard!.title}'), subtitle: Text(_selectedCard!.world.isNotEmpty ? _selectedCard!.world : 'No world')),
+            if (_selectedCharacters.isNotEmpty)
+              Column(
+                children: [
+                  ListTile(title: Text('Characters (${_selectedCharacters.length})')),
+                  for (final ch in _selectedCharacters)
+                    ListTile(title: Text(ch.name), subtitle: Text(ch.description, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  if (_selectedCharacters.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: DropdownButton<RPCharacter>(
+                        isExpanded: true,
+                        value: _playerCharacter ?? _selectedCharacters.first,
+                        items: _selectedCharacters.map((c) => DropdownMenuItem(value: c, child: Text('Player: ${c.name}'))).toList(),
+                        onChanged: (v) => setState(() => _playerCharacter = v),
+                      ),
+                    ),
+                ],
+              ),
+            if (_selectedCards.isNotEmpty)
+              Column(
+                children: [
+                  ListTile(title: Text('Story Cards (${_selectedCards.length})')),
+                  for (final card in _selectedCards)
+                    ListTile(title: Text(card.title), subtitle: Text(card.world.isNotEmpty ? card.world : 'No world')),
+                ],
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -190,8 +285,9 @@ class _SessionManagerState extends State<SessionManager> {
                     _nameController.clear();
                     _rulesController.clear();
                     setState(() {
-                      _selectedCharacter = null;
-                      _selectedCard = null;
+                      _selectedCharacters.clear();
+                      _selectedCards.clear();
+                      _playerCharacter = null;
                     });
                   },
                   icon: const Icon(Icons.clear),

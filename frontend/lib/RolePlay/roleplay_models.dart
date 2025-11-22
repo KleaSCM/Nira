@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class RPCharacter {
   int? id;
   String name;
@@ -45,8 +47,9 @@ class RPSession {
   int? id;
   String name;
   String world;
-  int? characterId;
-  int? storyCardId;
+  int? playerCharacterId;
+  List<int> characterIds;
+  List<int> storyCardIds;
   String rules;
   int createdAt;
 
@@ -54,18 +57,21 @@ class RPSession {
     this.id,
     required this.name,
     this.world = '',
-    this.characterId,
-    this.storyCardId,
+    this.playerCharacterId,
+    List<int>? characterIds,
+    List<int>? storyCardIds,
     this.rules = '',
     required this.createdAt,
-  });
+  })  : characterIds = characterIds ?? [],
+        storyCardIds = storyCardIds ?? [];
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
         'name': name,
         'world': world,
-        'character_id': characterId,
-        'story_card_id': storyCardId,
+        'player_character_id': playerCharacterId,
+        'character_ids': jsonEncode(characterIds),
+        'story_card_ids': jsonEncode(storyCardIds),
         'rules': rules,
         'created_at': createdAt,
       };
@@ -74,9 +80,34 @@ class RPSession {
         id: m['id'] as int?,
         name: m['name'] as String,
         world: (m['world'] as String?) ?? '',
-        characterId: m['character_id'] as int?,
-        storyCardId: m['story_card_id'] as int?,
+        playerCharacterId: m['player_character_id'] as int?,
+        characterIds: m['character_ids'] != null && (m['character_ids'] is String)
+            ? (jsonDecode(m['character_ids'] as String) as List).cast<int>()
+            : <int>[],
+        storyCardIds: m['story_card_ids'] != null && (m['story_card_ids'] is String)
+            ? (jsonDecode(m['story_card_ids'] as String) as List).cast<int>()
+            : <int>[],
         rules: (m['rules'] as String?) ?? '',
         createdAt: m['created_at'] as int,
+      );
+}
+
+class RPWorld {
+  int? id;
+  String name;
+  String description;
+
+  RPWorld({this.id, required this.name, this.description = ''});
+
+  Map<String, dynamic> toMap() => {
+        if (id != null) 'id': id,
+        'name': name,
+        'description': description,
+      };
+
+  factory RPWorld.fromMap(Map<String, dynamic> m) => RPWorld(
+        id: m['id'] as int?,
+        name: m['name'] as String,
+        description: (m['description'] as String?) ?? '',
       );
 }

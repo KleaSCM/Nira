@@ -21,8 +21,8 @@ class RolePlayRepository {
   Future<Database> _initDb() async {
     final databasesPath = await getDatabasesPath();
     final path = join(databasesPath, 'nira_roleplay.db');
-    // bump DB version to 3 to add session linkage columns
-    return await openDatabase(path, version: 3, onCreate: (db, ver) async {
+    // bump DB version to 5 to add worlds table and session linkage
+    return await openDatabase(path, version: 5, onCreate: (db, ver) async {
       await db.execute('''
         CREATE TABLE characters (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,10 +43,18 @@ class RolePlayRepository {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           world TEXT,
-          character_id INTEGER,
-          story_card_id INTEGER,
+          player_character_id INTEGER,
+          character_ids TEXT,
+          story_card_ids TEXT,
           rules TEXT,
           created_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE worlds (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          description TEXT DEFAULT ''
         )
       ''');
     }, onUpgrade: (db, oldVer, newVer) async {
@@ -57,12 +65,29 @@ class RolePlayRepository {
         } catch (_) {}
       }
       if (oldVer < 3) {
-        // add session linkage columns
+        // previous upgrade steps (ensure world column exists)
         try {
           await db.execute("ALTER TABLE sessions ADD COLUMN world TEXT");
-          await db.execute("ALTER TABLE sessions ADD COLUMN character_id INTEGER");
-          await db.execute("ALTER TABLE sessions ADD COLUMN story_card_id INTEGER");
+        } catch (_) {}
+      }
+      if (oldVer < 4) {
+        // add session linkage columns for multi-ids and player character
+        try {
+          await db.execute("ALTER TABLE sessions ADD COLUMN player_character_id INTEGER");
+          await db.execute("ALTER TABLE sessions ADD COLUMN character_ids TEXT");
+          await db.execute("ALTER TABLE sessions ADD COLUMN story_card_ids TEXT");
           await db.execute("ALTER TABLE sessions ADD COLUMN rules TEXT");
+        } catch (_) {}
+      }
+      if (oldVer < 5) {
+        try {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS worlds (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL UNIQUE,
+              description TEXT DEFAULT ''
+            )
+          ''');
         } catch (_) {}
       }
     });
@@ -167,21 +192,59 @@ class RolePlayRepository {
   }
 
   Future<List<String>> getWorlds() async {
-    // Return distinct worlds from story cards
+    // Prefer worlds table; fall back to distinct world values on story_cards
     if (kIsWeb) {
       final prefs = await _prefs();
+      final rawWorlds = prefs.getString('rp_worlds') ?? '[]';
+      final list = (jsonDecode(rawWorlds) as List).cast<Map<String, dynamic>>();
+      final names = list.map((m) => (m['name'] as String)).toSet();
+
+      // also include any worlds referenced by story cards (web fallback)
       final raw = prefs.getString('rp_cards') ?? '[]';
       final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      final worlds = <String>{};
       for (final r in rows) {
         final w = (r['world'] as String?) ?? '';
-        if (w.isNotEmpty) worlds.add(w);
+        if (w.isNotEmpty) names.add(w);
       }
-      return worlds.toList();
+      return names.toList();
     } else {
       final d = await db;
+      // check worlds table first
+      try {
+        final wRows = await d.query('worlds', orderBy: 'name ASC');
+        if (wRows.isNotEmpty) return wRows.map((r) => (r['name'] as String)).toList();
+      } catch (_) {}
+
+      // fallback: distinct worlds from story_cards
       final rows = await d.rawQuery("SELECT DISTINCT world FROM story_cards WHERE world IS NOT NULL AND world != ''");
       return rows.map((r) => (r['world'] as String)).toList();
+    }
+  }
+
+  // Worlds
+  Future<int> insertWorld(RPWorld w) async {
+    if (kIsWeb) {
+      final prefs = await _prefs();
+      final raw = prefs.getString('rp_worlds') ?? '[]';
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      // prevent duplicates by name
+      final exists = list.any((m) => (m['name'] as String).toLowerCase() == w.name.toLowerCase());
+      if (exists) return -1;
+      final next = prefs.getInt('rp_world_next_id') ?? 1;
+      final map = w.toMap();
+      map['id'] = next;
+      list.insert(0, map);
+      await prefs.setString('rp_worlds', jsonEncode(list));
+      await prefs.setInt('rp_world_next_id', next + 1);
+      return next;
+    } else {
+      final d = await db;
+      try {
+        return await d.insert('worlds', w.toMap());
+      } catch (e) {
+        // unique constraint failed
+        return -1;
+      }
     }
   }
 }
