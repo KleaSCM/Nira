@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:nira_frontend/WebSocketService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'roleplay_models.dart';
 
@@ -105,63 +106,138 @@ class RolePlayRepository {
 
   // Characters
   Future<int> insertCharacter(RPCharacter c) async {
-    if (kIsWeb) {
-      final prefs = await _prefs();
-      final raw = prefs.getString('rp_chars') ?? '[]';
-      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      final next = prefs.getInt('rp_char_next_id') ?? 1;
-      final map = c.toMap();
-      map['id'] = next;
-      list.insert(0, map);
-      await prefs.setString('rp_chars', jsonEncode(list));
-      await prefs.setInt('rp_char_next_id', next + 1);
-      return next;
-    } else {
-      final d = await db;
-      return await d.insert('characters', c.toMap());
+    // Prefer backend RP tool; fallback to local storage if it fails
+    try {
+      final ws = WebSocketService.instance;
+      ws.connect('ws://localhost:8080/ws');
+      final res = await ws.callToolJson('rp_character_save', {
+        'name': c.name,
+        // Map description -> summary; keep background empty for now
+        'summary': c.description,
+        'background': '',
+        'traits': <String>[],
+        'goals': <String>[],
+        'tags': <String>[],
+        'notes': '',
+      });
+      // Backend returns an object with string id; we ignore local int id
+      return 0;
+    } catch (_) {
+      if (kIsWeb) {
+        final prefs = await _prefs();
+        final raw = prefs.getString('rp_chars') ?? '[]';
+        final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+        final next = prefs.getInt('rp_char_next_id') ?? 1;
+        final map = c.toMap();
+        map['id'] = next;
+        list.insert(0, map);
+        await prefs.setString('rp_chars', jsonEncode(list));
+        await prefs.setInt('rp_char_next_id', next + 1);
+        return next;
+      } else {
+        final d = await db;
+        return await d.insert('characters', c.toMap());
+      }
     }
   }
   Future<List<RPCharacter>> getCharacters() async {
-    if (kIsWeb) {
-      final prefs = await _prefs();
-      final raw = prefs.getString('rp_chars') ?? '[]';
-      final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      return rows.map((r) => RPCharacter.fromMap(r)).toList();
-    } else {
-      final d = await db;
-      final rows = await d.query('characters', orderBy: 'id DESC');
-      return rows.map((r) => RPCharacter.fromMap(r)).toList();
+    // Prefer backend list tool; fallback to local storage
+    try {
+      final ws = WebSocketService.instance;
+      ws.connect('ws://localhost:8080/ws');
+      final res = await ws.callToolJson('rp_character_list', {
+        'limit': 200,
+        'offset': 0,
+      });
+      if (res is List) {
+        return res.map<RPCharacter>((e) {
+          final m = (e as Map).cast<String, dynamic>();
+          return RPCharacter(
+            id: null,
+            name: (m['name'] ?? '') as String,
+            description: (m['summary'] ?? m['notes'] ?? '') as String,
+            world: '',
+          );
+        }).toList();
+      }
+      return <RPCharacter>[];
+    } catch (_) {
+      if (kIsWeb) {
+        final prefs = await _prefs();
+        final raw = prefs.getString('rp_chars') ?? '[]';
+        final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+        return rows.map((r) => RPCharacter.fromMap(r)).toList();
+      } else {
+        final d = await db;
+        final rows = await d.query('characters', orderBy: 'id DESC');
+        return rows.map((r) => RPCharacter.fromMap(r)).toList();
+      }
     }
   }
 
   // Story cards
   Future<int> insertStoryCard(RPStoryCard s) async {
-    if (kIsWeb) {
-      final prefs = await _prefs();
-      final raw = prefs.getString('rp_cards') ?? '[]';
-      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      final next = prefs.getInt('rp_card_next_id') ?? 1;
-      final map = s.toMap();
-      map['id'] = next;
-      list.insert(0, map);
-      await prefs.setString('rp_cards', jsonEncode(list));
-      await prefs.setInt('rp_card_next_id', next + 1);
-      return next;
-    } else {
-      final d = await db;
-      return await d.insert('story_cards', s.toMap());
+    // Prefer backend RP tool; fallback to local storage
+    try {
+      final ws = WebSocketService.instance;
+      ws.connect('ws://localhost:8080/ws');
+      final _ = await ws.callToolJson('rp_storycard_save', {
+        'title': s.title,
+        'kind': 'lore',
+        'content': s.content,
+        'tags': <String>[],
+        'links': <String>[],
+      });
+      return 0;
+    } catch (_) {
+      if (kIsWeb) {
+        final prefs = await _prefs();
+        final raw = prefs.getString('rp_cards') ?? '[]';
+        final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+        final next = prefs.getInt('rp_card_next_id') ?? 1;
+        final map = s.toMap();
+        map['id'] = next;
+        list.insert(0, map);
+        await prefs.setString('rp_cards', jsonEncode(list));
+        await prefs.setInt('rp_card_next_id', next + 1);
+        return next;
+      } else {
+        final d = await db;
+        return await d.insert('story_cards', s.toMap());
+      }
     }
   }
   Future<List<RPStoryCard>> getStoryCards() async {
-    if (kIsWeb) {
-      final prefs = await _prefs();
-      final raw = prefs.getString('rp_cards') ?? '[]';
-      final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-      return rows.map((r) => RPStoryCard.fromMap(r)).toList();
-    } else {
-      final d = await db;
-      final rows = await d.query('story_cards', orderBy: 'id DESC');
-      return rows.map((r) => RPStoryCard.fromMap(r)).toList();
+    try {
+      final ws = WebSocketService.instance;
+      ws.connect('ws://localhost:8080/ws');
+      final res = await ws.callToolJson('rp_storycard_list', {
+        'limit': 200,
+        'offset': 0,
+      });
+      if (res is List) {
+        return res.map<RPStoryCard>((e) {
+          final m = (e as Map).cast<String, dynamic>();
+          return RPStoryCard(
+            id: null,
+            title: (m['title'] ?? '') as String,
+            content: (m['content'] ?? '') as String,
+            world: '',
+          );
+        }).toList();
+      }
+      return <RPStoryCard>[];
+    } catch (_) {
+      if (kIsWeb) {
+        final prefs = await _prefs();
+        final raw = prefs.getString('rp_cards') ?? '[]';
+        final rows = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+        return rows.map((r) => RPStoryCard.fromMap(r)).toList();
+      } else {
+        final d = await db;
+        final rows = await d.query('story_cards', orderBy: 'id DESC');
+        return rows.map((r) => RPStoryCard.fromMap(r)).toList();
+      }
     }
   }
 

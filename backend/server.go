@@ -42,8 +42,9 @@ type Server struct {
 
 // DirectToolCall represents a tool call directly from the frontend
 type DirectToolCall struct {
-	Name      string                 `json:"name"`
-	Arguments map[string]interface{} `json:"arguments"`
+    ID        string                 `json:"id,omitempty"`
+    Name      string                 `json:"name"`
+    Arguments map[string]interface{} `json:"arguments"`
 }
 
 func NewServer(port int, ollama *OllamaClient, registry *tools.Registry, logger *Logger, mem *memory.Manager) *Server {
@@ -129,7 +130,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDirectToolCall(conn *websocket.Conn, toolCall *DirectToolCall) {
-	s.Logger.Info("Executing direct tool call: %s with args: %v", toolCall.Name, toolCall.Arguments)
+    s.Logger.Info("Executing direct tool call: %s with args: %v", toolCall.Name, toolCall.Arguments)
 
 	// Get the tool from registry
 	tool, exists := s.ToolRegistry.Tools[toolCall.Name]
@@ -143,23 +144,35 @@ func (s *Server) handleDirectToolCall(conn *websocket.Conn, toolCall *DirectTool
 		return
 	}
 
-	// Execute the tool
-	result, err := tool.Execute(toolCall.Arguments)
-	if err != nil {
-		s.Logger.Error("Tool execution failed: %v", err)
-		errorMsg := WSMessage{
-			Type:    MessageTypeError,
-			Content: fmt.Sprintf("Tool execution failed: %v", err),
-		}
-		conn.WriteJSON(errorMsg)
-		return
-	}
+ // Execute the tool
+ result, err := tool.Execute(toolCall.Arguments)
+ if err != nil {
+     s.Logger.Error("Tool execution failed: %v", err)
+     // If this was a silent call with an ID, return a single error message tagged with the ID
+     if toolCall.Arguments != nil {
+         if silent, ok := toolCall.Arguments["_silent"].(bool); ok && silent {
+             errorMsg := WSMessage{
+                 Type:    MessageTypeError,
+                 Content: fmt.Sprintf("Tool execution failed: %v", err),
+                 ID:      toolCall.ID,
+             }
+             conn.WriteJSON(errorMsg)
+             return
+         }
+     }
+     errorMsg := WSMessage{
+         Type:    MessageTypeError,
+         Content: fmt.Sprintf("Tool execution failed: %v", err),
+     }
+     conn.WriteJSON(errorMsg)
+     return
+ }
 
 	s.Logger.Info("Tool executed successfully, result type: %T", result)
 
  // Format the result
- var resultText string
- switch v := result.(type) {
+    var resultText string
+    switch v := result.(type) {
  case []tools.WebSearchResult:
      resultText = s.formatWebSearchResults(v)
  case string:
@@ -177,21 +190,50 @@ func (s *Server) handleDirectToolCall(conn *websocket.Conn, toolCall *DirectTool
          }
      }
  default:
-     // Try to JSON serialize any other type
-     if jsonBytes, err := json.MarshalIndent(result, "", "  "); err == nil {
-         resultText = string(jsonBytes)
-     } else {
-         resultText = fmt.Sprintf("%v", result)
-     }
- }
+        // Try to JSON serialize any other type
+        if jsonBytes, err := json.MarshalIndent(result, "", "  "); err == nil {
+            resultText = string(jsonBytes)
+        } else {
+            resultText = fmt.Sprintf("%v", result)
+        }
+    }
 
- // Add tool result to conversation context (generic wording)
- header := fmt.Sprintf("[Tool %s result]", toolCall.Name)
- if q, ok := toolCall.Arguments["query"]; ok {
-     header = fmt.Sprintf("[Tool %s for '%v']", toolCall.Name, q)
- } else if p, ok := toolCall.Arguments["path"]; ok {
-     header = fmt.Sprintf("[Tool %s: %v]", toolCall.Name, p)
- }
+    // If this was a silent call with an ID, send a single system message containing the JSON (or text) and return.
+    if toolCall.Arguments != nil {
+        if silent, ok := toolCall.Arguments["_silent"].(bool); ok && silent {
+            // Prefer to send JSON for structured results
+            var payload string
+            switch res := result.(type) {
+            case string:
+                // Wrap plain strings as JSON string literal
+                b, _ := json.Marshal(res)
+                payload = string(b)
+            default:
+                if jb, err := json.Marshal(res); err == nil {
+                    payload = string(jb)
+                } else {
+                    // fallback to resultText
+                    b, _ := json.Marshal(resultText)
+                    payload = string(b)
+                }
+            }
+            reply := WSMessage{
+                Type:    MessageTypeSystem,
+                Content: payload,
+                ID:      toolCall.ID,
+            }
+            _ = conn.WriteJSON(reply)
+            return
+        }
+    }
+
+    // Add tool result to conversation context (generic wording)
+    header := fmt.Sprintf("[Tool %s result]", toolCall.Name)
+    if q, ok := toolCall.Arguments["query"]; ok {
+        header = fmt.Sprintf("[Tool %s for '%v']", toolCall.Name, q)
+    } else if p, ok := toolCall.Arguments["path"]; ok {
+        header = fmt.Sprintf("[Tool %s: %v]", toolCall.Name, p)
+    }
  toolResultMsg := fmt.Sprintf("%s\n%s", header, resultText)
 
 	s.Conversation = append(s.Conversation, ChatMessage{
