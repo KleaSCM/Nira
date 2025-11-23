@@ -58,7 +58,7 @@ func main() {
 
 	ollamaClient := NewOllamaClient(config.OllamaEndpoint, config.DefaultModel)
 
- toolRegistry := tools.NewRegistry()
+	toolRegistry := tools.NewRegistry()
  // Use centralized AllowedDirs store for permission checks
  fileReadTool := tools.NewFileReadToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(fileReadTool)
@@ -79,10 +79,21 @@ func main() {
  toolRegistry.Register(tools.NewAllowedDirsAddTool(allowedStore))
  toolRegistry.Register(tools.NewAllowedDirsRemoveTool(allowedStore))
 
- // Basic RAG indexing and retrieval tools
- ragIndex := memory.NewRagIndex(db)
- toolRegistry.Register(tools.NewRagIndexFolderTool(allowedStore, ragIndex))
- toolRegistry.Register(tools.NewRagSearchTool(ragIndex, allowedStore))
+	// Basic RAG indexing and retrieval tools
+	ragIndex := memory.NewRagIndex(db)
+	toolRegistry.Register(tools.NewRagIndexFolderTool(allowedStore, ragIndex))
+	toolRegistry.Register(tools.NewRagSearchTool(ragIndex, allowedStore))
+
+	// RP data store and tools (backend-driven RP logic)
+	rpStore := memory.NewRPStore(db)
+	toolRegistry.Register(tools.NewRPCharacterListTool(rpStore))
+	toolRegistry.Register(tools.NewRPCharacterGetTool(rpStore))
+	toolRegistry.Register(tools.NewRPCharacterSaveTool(rpStore))
+	toolRegistry.Register(tools.NewRPCharacterDeleteTool(rpStore))
+	toolRegistry.Register(tools.NewRPStoryCardListTool(rpStore))
+	toolRegistry.Register(tools.NewRPStoryCardGetTool(rpStore))
+	toolRegistry.Register(tools.NewRPStoryCardSaveTool(rpStore))
+	toolRegistry.Register(tools.NewRPStoryCardDeleteTool(rpStore))
 
 	// Register WebSearchTool
 	tools.RegisterWebSearchTool(toolRegistry.Tools)

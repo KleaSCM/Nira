@@ -410,6 +410,12 @@ func (s *Server) buildSystemPrompt() string {
     prompt += "- To retrieve relevant files/snippets, call rag_search with {query:\"...\", limit, path_prefix}.\n"
     prompt += "- Always ensure the root/path_prefix is within allowed directories; if not, request permission first.\n"
 
+    prompt += "\nRolePlay (RP) data management (backend-owned):\n"
+    prompt += "- Characters: use rp_character_list, rp_character_get, rp_character_save, rp_character_delete.\n"
+    prompt += "- Story cards: use rp_storycard_list, rp_storycard_get, rp_storycard_save, rp_storycard_delete.\n"
+    prompt += "- When saving, provide full fields; the backend persists them in SQLite.\n"
+    prompt += "- IDs are strings. If you omit id on save, a new one will be generated.\n"
+
     prompt += "\nFew-shot examples (copy the JSON exactly when calling tools):\n"
     prompt += "User: tell me what files are in Docs directory\n"
     prompt += "Assistant: {\"name\":\"list_directory\",\"arguments\":{\"path\":\"./Docs\",\"recursive\":false}}\n\n"
@@ -425,6 +431,13 @@ func (s *Server) buildSystemPrompt() string {
 
     prompt += "User: find notes about vector search in my notes folder\n"
     prompt += "Assistant: {\"name\":\"rag_search\",\"arguments\":{\"query\":\"vector search\",\"path_prefix\":\"D:\\\\\\Notes\"}}\n\n"
+
+    // RP few-shots
+    prompt += "User: create a character named Aria with traits brave and curious\n"
+    prompt += "Assistant: {\"name\":\"rp_character_save\",\"arguments\":{\"name\":\"Aria\",\"traits\":[\"brave\",\"curious\"]}}\n\n"
+
+    prompt += "User: list my story cards about the academy\n"
+    prompt += "Assistant: {\"name\":\"rp_storycard_list\",\"arguments\":{\"query\":\"academy\",\"limit\":50}}\n\n"
 
     return prompt
 }

@@ -95,6 +95,36 @@ func (d *Database) InitializeSchema() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_rag_index_name ON rag_index(name);
 	CREATE INDEX IF NOT EXISTS idx_rag_index_mod ON rag_index(mod_time);
+
+	-- RP entities
+	CREATE TABLE IF NOT EXISTS rp_characters (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		summary TEXT,
+		traits_json TEXT,
+		background TEXT,
+		goals_json TEXT,
+		tags_json TEXT,
+		notes TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_rp_characters_name ON rp_characters(name);
+	CREATE INDEX IF NOT EXISTS idx_rp_characters_updated ON rp_characters(updated_at);
+
+	CREATE TABLE IF NOT EXISTS rp_story_cards (
+		id TEXT PRIMARY KEY,
+		title TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		content TEXT,
+		tags_json TEXT,
+		links_json TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_rp_story_cards_title ON rp_story_cards(title);
+	CREATE INDEX IF NOT EXISTS idx_rp_story_cards_kind ON rp_story_cards(kind);
+	CREATE INDEX IF NOT EXISTS idx_rp_story_cards_updated ON rp_story_cards(updated_at);
     `
 
 	if _, err := d.DB.Exec(schema); err != nil {
