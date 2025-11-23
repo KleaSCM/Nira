@@ -7,6 +7,23 @@ import 'package:nira_frontend/WebSocketService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'roleplay_models.dart';
 
+/// RolePlayRepository
+///
+/// Frontend-only adapter with a thin client -> server boundary.
+///
+/// - Primary path: uses the backend RP tools over WebSocket (rp_* tools)
+///   via WebSocketService.callToolJson(). This is not “backend code” living
+///   in the frontend — it’s a remote call to the Go backend, similar to a
+///   REST/RPC client.
+/// - Fallback path: if the backend is unavailable (e.g., running the web
+///   build without the Go server), we use local persistence to keep the UI
+///   usable. On web, that’s SharedPreferences; on desktop/mobile, a small
+///   sqflite database.
+///
+/// This keeps the Flutter layer as a GUI while centralizing RP logic and
+/// persistence on the backend when it’s running. No RP business logic lives
+/// here; it’s just transport + local fallback.
+
 class RolePlayRepository {
   static final RolePlayRepository _instance = RolePlayRepository._internal();
   factory RolePlayRepository() => _instance;
