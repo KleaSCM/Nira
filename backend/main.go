@@ -52,6 +52,9 @@ func main() {
 	fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
 	toolRegistry.Register(fileReadTool)
 
+	fileWriteTool := tools.NewFileWriteTool(config.AllowedPaths)
+	toolRegistry.Register(fileWriteTool)
+
 	// Register WebSearchTool
 	tools.RegisterWebSearchTool(toolRegistry.Tools)
 

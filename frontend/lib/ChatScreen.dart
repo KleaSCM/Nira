@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:nira_frontend/WebSocketService.dart';
 import 'package:nira_frontend/RolePlay/RolePlayDashboard.dart';
 
@@ -156,6 +157,117 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+      if (result != null && result.files.single.path != null) {
+        String filePath = result.files.single.path!;
+
+        // Ask the user whether to Read or Write the selected file
+        final action = await showDialog<String>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('File Action'),
+              content: Text('What would you like to do with\n$filePath?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop('read'),
+                  child: const Text('Read'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop('write'),
+                  child: const Text('Write'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (action == 'write') {
+          // Prompt for content to write
+          final controller = TextEditingController();
+          final writeConfirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Write to file'),
+                content: SizedBox(
+                  width: 500,
+                  child: TextField(
+                    controller: controller,
+                    maxLines: 8,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter text content to write',
+                      border: OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Write'),
+                  ),
+                ],
+              );
+            },
+          );
+
+          if (writeConfirmed == true) {
+            final content = controller.text;
+            setState(() {
+              Messages.add({
+                'text': 'Writing to file: $filePath',
+                'sender': 'You',
+              });
+              CurrentAssistantIndex = -1;
+              _isComposing = false;
+            });
+            _scrollToBottom();
+
+            final toolCall = {
+              'name': 'write_file',
+              'arguments': {
+                'path': filePath,
+                'content': content,
+              },
+            };
+            WsService.sendToolCall(toolCall);
+          }
+        } else if (action == 'read' || action == null) {
+          // Default to read if user chose Read or dismissed dialog
+          setState(() {
+            Messages.add({
+              'text': 'Reading file: $filePath',
+              'sender': 'You',
+            });
+            CurrentAssistantIndex = -1;
+            _isComposing = false;
+          });
+          _scrollToBottom();
+
+          final toolCall = {
+            'name': 'read_file',
+            'arguments': {
+              'path': filePath,
+            },
+          };
+          WsService.sendToolCall(toolCall);
+        }
+      }
+    } catch (e) {
+      setState(() {
+        Messages.add({'text': 'Error picking file: $e', 'sender': 'System'});
+      });
+    }
+  }
+
   // Send web search tool call to backend and display results
   void _sendWebSearch(String query) async {
     if (query.isEmpty) return;
@@ -182,7 +294,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: isNira 
+          colors: isNira
             ? [Color(0xFFFF69B4), Color(0xFFFF1493)]
             : [Color(0xFFE6B3FF), Color(0xFFDA70D6)],
           begin: Alignment.topLeft,
@@ -210,7 +322,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Widget _buildMessageBubble(Map<String, String> message, int index) {
     final isUser = message['sender'] == 'You';
     final isError = message['sender'] == 'System';
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
       child: Row(
@@ -224,9 +336,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: isError 
+                  colors: isError
                     ? [errorColor, errorColor]
-                    : isUser 
+                    : isUser
                       ? [Color(0xFFFFE4F0), Color(0xFFFFD6E8)]
                       : [Color(0xFFFFF8DC), Color(0xFFFFF0DB)],
                   begin: Alignment.topLeft,
@@ -643,6 +755,8 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
             onPressed: () {
               if (label == 'Web Search') {
                 _showWebSearchDialog();
+              } else if (label == 'File') {
+                _pickFile();
               }
               // TODO: Implement other tool functionality
             },

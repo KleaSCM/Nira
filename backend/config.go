@@ -12,20 +12,24 @@
 
 package main
 
+
+
 type Config struct {
-	OllamaEndpoint string
-	DefaultModel   string
-	DatabasePath   string
-	WebSocketPort  int
-	AllowedPaths   []string
+    OllamaEndpoint string
+    DefaultModel   string
+    DatabasePath   string
+    WebSocketPort  int
+    AllowedPaths   []string
 }
 
 func LoadConfig() (Config, error) {
-	return Config{
-		OllamaEndpoint: "http://localhost:11434",
-		DefaultModel:   "HammerAI/mythomax-l2",
-		DatabasePath:   "./nira.db",
-		WebSocketPort:  8080,
-		AllowedPaths:   []string{},
-	}, nil
+    return Config{
+        OllamaEndpoint: "http://localhost:11434",
+        DefaultModel:   "HammerAI/mythomax-l2",
+        DatabasePath:   "./nira.db",
+        WebSocketPort:  8080,
+        // Allow tools to access files within the project directory by default.
+        // You can extend this list later (e.g., to specific folders) for tighter security.
+        AllowedPaths:   []string{"."},
+    }, nil
 }

@@ -157,26 +157,42 @@ func (s *Server) handleDirectToolCall(conn *websocket.Conn, toolCall *DirectTool
 
 	s.Logger.Info("Tool executed successfully, result type: %T", result)
 
-	// Format the result
-	var resultText string
-	switch v := result.(type) {
-	case []tools.WebSearchResult:
-		resultText = s.formatWebSearchResults(v)
-	case string:
-		resultText = v
-	default:
-		// Try to JSON serialize
-		jsonBytes, err := json.MarshalIndent(result, "", "  ")
-		if err != nil {
-			resultText = fmt.Sprintf("%v", result)
-		} else {
-			resultText = string(jsonBytes)
-		}
-	}
+ // Format the result
+ var resultText string
+ switch v := result.(type) {
+ case []tools.WebSearchResult:
+     resultText = s.formatWebSearchResults(v)
+ case string:
+     resultText = v
+ case map[string]interface{}:
+     // Prefer showing primary content field if present
+     if content, ok := v["content"].(string); ok {
+         resultText = content
+     } else {
+         // Fallback to JSON
+         if jsonBytes, err := json.MarshalIndent(v, "", "  "); err == nil {
+             resultText = string(jsonBytes)
+         } else {
+             resultText = fmt.Sprintf("%v", v)
+         }
+     }
+ default:
+     // Try to JSON serialize any other type
+     if jsonBytes, err := json.MarshalIndent(result, "", "  "); err == nil {
+         resultText = string(jsonBytes)
+     } else {
+         resultText = fmt.Sprintf("%v", result)
+     }
+ }
 
-	// Add tool result to conversation context
-	toolResultMsg := fmt.Sprintf("[Web Search Results for '%s']:\n%s",
-		toolCall.Arguments["query"], resultText)
+ // Add tool result to conversation context (generic wording)
+ header := fmt.Sprintf("[Tool %s result]", toolCall.Name)
+ if q, ok := toolCall.Arguments["query"]; ok {
+     header = fmt.Sprintf("[Tool %s for '%v']", toolCall.Name, q)
+ } else if p, ok := toolCall.Arguments["path"]; ok {
+     header = fmt.Sprintf("[Tool %s: %v]", toolCall.Name, p)
+ }
+ toolResultMsg := fmt.Sprintf("%s\n%s", header, resultText)
 
 	s.Conversation = append(s.Conversation, ChatMessage{
 		Role:    "user",
@@ -331,6 +347,16 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, content string) {
 
 		// Inject tool result back into conversation
 		toolResultStr := s.ToolHandler.FormatToolResult(toolCall.Name, toolResult)
+
+
+		// 1. Add what the assistant just said (the tool call request)
+		assistantMsg := ChatMessage{
+			Role:    "assistant",
+			Content: assistantContent,
+		}
+		s.Conversation = append(s.Conversation, assistantMsg)
+
+
 		toolMsg := ChatMessage{
 			Role:    "user",
 			Content: toolResultStr,
@@ -344,11 +370,10 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, content string) {
 		}
 		conn.WriteJSON(toolResultMsg)
 
-		// Continue conversation with tool result
-		messages = append(messages, ChatMessage{
-			Role:    "assistant",
-			Content: assistantContent,
-		}, toolMsg)
+		messages = append(messages, assistantMsg)
+		messages = append(messages, toolMsg)
+
+		// Loop continues now with updated 'messages'...
 	}
 
 	s.Logger.Warn("Maximum tool call iterations reached")
@@ -358,17 +383,17 @@ func (s *Server) buildSystemPrompt() string {
 	prompt := "You are NIRA, a helpful AI assistant. Be concise and friendly.\n\n"
 	prompt += "Available tools:\n"
 
-	toolsList := s.ToolRegistry.ListTools()
-	for _, tool := range toolsList {
-		if name, ok := tool["name"].(string); ok {
-			if desc, ok := tool["description"].(string); ok {
-				prompt += fmt.Sprintf("- %s: %s\n", name, desc)
-			}
-		}
+	// Iterate and format tool schemas
+	for _, tool := range s.ToolRegistry.ListTools() {
+		// Simple formatting of the schema
+		prompt += fmt.Sprintf("- %s: %s\n", tool["name"], tool["description"])
+		// add input parameters schema here if needed for better accuracy
 	}
 
-	prompt += "\nTo use a tool, respond with a JSON object like: {\"name\": \"tool_name\", \"arguments\": {\"arg1\": \"value1\"}}\n"
-	prompt += "Or use the format: tool_name(arg1=\"value1\", arg2=\"value2\")\n"
+	prompt += "\nINSTRUCTIONS:\n"
+	prompt += "1. To use a tool, respond with the JSON format: { \"name\": \"tool_name\", \"arguments\": { ... } }\n"
+	prompt += "2. When you receive a tool result, use the information to answer the user's original question.\n"
+	prompt += "3. Do not make up facts. If the tool result doesn't help, say so.\n"
 
 	return prompt
 }
