@@ -48,12 +48,20 @@ func main() {
 
 	ollamaClient := NewOllamaClient(config.OllamaEndpoint, config.DefaultModel)
 
-	toolRegistry := tools.NewRegistry()
-	fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
-	toolRegistry.Register(fileReadTool)
+ toolRegistry := tools.NewRegistry()
+ fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
+ toolRegistry.Register(fileReadTool)
 
-	fileWriteTool := tools.NewFileWriteTool(config.AllowedPaths)
-	toolRegistry.Register(fileWriteTool)
+ fileWriteTool := tools.NewFileWriteTool(config.AllowedPaths)
+ toolRegistry.Register(fileWriteTool)
+
+ // RAG foundation tools
+ listDirTool := tools.NewListDirectoryTool(config.AllowedPaths)
+ toolRegistry.Register(listDirTool)
+ searchByNameTool := tools.NewSearchFilesByNameTool(config.AllowedPaths)
+ toolRegistry.Register(searchByNameTool)
+ fileMetaTool := tools.NewFileMetadataTool(config.AllowedPaths)
+ toolRegistry.Register(fileMetaTool)
 
 	// Register WebSearchTool
 	tools.RegisterWebSearchTool(toolRegistry.Tools)

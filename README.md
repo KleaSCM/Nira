@@ -114,11 +114,17 @@ Each tool has its own dedicated documentation under Docs/Tools/:
 - Docs/Tools/read_file.md
 - Docs/Tools/write_file.md
 - Docs/Tools/web_search.md
+- Docs/Tools/list_directory.md
+- Docs/Tools/search_files_by_name.md
+- Docs/Tools/file_metadata.md
 
 Quick summary
 - read_file: Reads text from a file within AllowedPaths.
 - write_file: Writes text to a file (creates parent directories; overwrites).
 - web_search: Performs a web search and returns a list of results.
+- list_directory: Lists files/folders in a directory (optional recursion, filters).
+- search_files_by_name: Searches for files (and optionally directories) by name within a root.
+- file_metadata: Returns basic metadata for a file or directory.
 
 Refer to the per-tool docs above for arguments, return formats, examples, and security notes.
 
