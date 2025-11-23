@@ -20,13 +20,17 @@ import (
 )
 
 type FileReadTool struct {
-	AllowedPaths []string
+    AllowedPaths []string
+    checker      PathChecker
 }
 
 func NewFileReadTool(allowedPaths []string) *FileReadTool {
-	return &FileReadTool{
-		AllowedPaths: allowedPaths,
-	}
+    return &FileReadTool{AllowedPaths: allowedPaths}
+}
+
+// NewFileReadToolWithChecker uses a centralized PathChecker; falls back to AllowedPaths if nil.
+func NewFileReadToolWithChecker(allowedPaths []string, checker PathChecker) *FileReadTool {
+    return &FileReadTool{AllowedPaths: allowedPaths, checker: checker}
 }
 
 func (t *FileReadTool) Name() string {
@@ -43,9 +47,9 @@ func (t *FileReadTool) Execute(args map[string]interface{}) (interface{}, error)
 		return nil, fmt.Errorf("path argument is required and must be a string")
 	}
 
-	if !t.isPathAllowed(path) {
-		return nil, fmt.Errorf("path not in allowed directories")
-	}
+ if !t.isPathAllowed(path) {
+        return nil, fmt.Errorf("path not in allowed directories")
+    }
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -82,14 +86,17 @@ func (t *FileReadTool) Schema() map[string]interface{} {
 }
 
 func (t *FileReadTool) isPathAllowed(path string) bool {
-	if len(t.AllowedPaths) == 0 {
-		return false
-	}
+    if t.checker != nil {
+        return t.checker.IsAllowed(path)
+    }
+    if len(t.AllowedPaths) == 0 {
+        return false
+    }
 
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return false
-	}
+    return false
+}
 
 	for _, allowed := range t.AllowedPaths {
 		absAllowed, err := filepath.Abs(allowed)

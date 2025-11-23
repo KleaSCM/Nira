@@ -380,20 +380,51 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, content string) {
 }
 
 func (s *Server) buildSystemPrompt() string {
-	prompt := "You are NIRA, a helpful AI assistant. Be concise and friendly.\n\n"
-	prompt += "Available tools:\n"
+    prompt := "You are NIRA, a helpful local AI assistant. Be concise and friendly. You can call tools to work with the user's local files.\n\n"
+    prompt += "Available tools (name: description):\n"
 
-	// Iterate and format tool schemas
-	for _, tool := range s.ToolRegistry.ListTools() {
-		// Simple formatting of the schema
-		prompt += fmt.Sprintf("- %s: %s\n", tool["name"], tool["description"])
-		// add input parameters schema here if needed for better accuracy
-	}
+    // Iterate and format tool schemas
+    for _, tool := range s.ToolRegistry.ListTools() {
+        prompt += fmt.Sprintf("- %s: %s\n", tool["name"], tool["description"])
+    }
 
-	prompt += "\nINSTRUCTIONS:\n"
-	prompt += "1. To use a tool, respond with the JSON format: { \"name\": \"tool_name\", \"arguments\": { ... } }\n"
-	prompt += "2. When you receive a tool result, use the information to answer the user's original question.\n"
-	prompt += "3. Do not make up facts. If the tool result doesn't help, say so.\n"
+    prompt += "\nGeneral rules for tool use:\n"
+    prompt += "- Always emit tool calls as a single JSON object: {\"name\":\"tool_name\",\"arguments\":{...}} with no extra text.\n"
+    prompt += "- After a tool result is injected back into context, read it and continue the task. If the task requires multiple steps, call additional tools.\n"
+    prompt += "- Paths are relative to the project root unless the user provides an absolute path. Prefer ./<folder> style.\n"
+    prompt += "- If a file or folder is unclear or not found, ask a brief clarifying question before proceeding.\n"
+    prompt += "- For edits, read the file first, compute the full new content, then write it using write_file (overwrite semantics).\n"
 
-	return prompt
+    prompt += "\nAllowed directory system:\n"
+    prompt += "- You may only access files within the user's allowed directories.\n"
+    prompt += "- If access is denied or a path is outside allowed roots, ask the user to allow the directory, or call allowed_dirs_add with their confirmation.\n"
+    prompt += "- You can inspect current permissions using allowed_dirs_list.\n"
+
+    prompt += "\nHow to handle common requests:\n"
+    prompt += "1) ‘Tell me what files are in <dir>’ → Call list_directory with {path:\"./<dir>\", recursive:false}.\n"
+    prompt += "2) ‘Summarize <file> in <dir>’ → If you don't know the exact path:\n   a) Call search_files_by_name with {root:\"./<dir>\", pattern:\"<file>\"}.\n   b) Pick the best match, then call read_file with {path}.\n   c) Write a concise summary as assistant text (no further tool call).\n"
+    prompt += "3) ‘Make <change> to <file> in <dir>’ →\n   a) search_files_by_name to find the file,\n   b) read_file to load content,\n   c) modify the text deterministically,\n   d) write_file with the full updated content.\n"
+
+    prompt += "\nIndexing and retrieval (basic local RAG):\n"
+    prompt += "- To index a folder of text files for faster search, call rag_index_folder with {root, patterns:[\"*.md\",\"*.txt\"], max_size_mb, max_files}.\n"
+    prompt += "- To retrieve relevant files/snippets, call rag_search with {query:\"...\", limit, path_prefix}.\n"
+    prompt += "- Always ensure the root/path_prefix is within allowed directories; if not, request permission first.\n"
+
+    prompt += "\nFew-shot examples (copy the JSON exactly when calling tools):\n"
+    prompt += "User: tell me what files are in Docs directory\n"
+    prompt += "Assistant: {\"name\":\"list_directory\",\"arguments\":{\"path\":\"./Docs\",\"recursive\":false}}\n\n"
+
+    prompt += "User: summarise README in root directory\n"
+    prompt += "Assistant: {\"name\":\"search_files_by_name\",\"arguments\":{\"root\":\".\",\"pattern\":\"README.md\"}}\n\n"
+
+    prompt += "User: make the title more exciting in README.md in root\n"
+    prompt += "Assistant: {\"name\":\"search_files_by_name\",\"arguments\":{\"root\":\".\",\"pattern\":\"README.md\"}}\n\n"
+
+    prompt += "User: allow access to D:\\\\Notes and index it\n"
+    prompt += "Assistant: {\"name\":\"allowed_dirs_add\",\"arguments\":{\"path\":\"D:\\\\\\Notes\"}}\n\n"
+
+    prompt += "User: find notes about vector search in my notes folder\n"
+    prompt += "Assistant: {\"name\":\"rag_search\",\"arguments\":{\"query\":\"vector search\",\"path_prefix\":\"D:\\\\\\Notes\"}}\n\n"
+
+    return prompt
 }

@@ -10,10 +10,12 @@ import (
 // ListDirectoryTool lists directory entries with optional recursion and filters.
 type ListDirectoryTool struct {
     AllowedPaths []string
+    checker      PathChecker
 }
 
-func NewListDirectoryTool(allowedPaths []string) *ListDirectoryTool {
-    return &ListDirectoryTool{AllowedPaths: allowedPaths}
+func NewListDirectoryTool(allowedPaths []string) *ListDirectoryTool { return &ListDirectoryTool{AllowedPaths: allowedPaths} }
+func NewListDirectoryToolWithChecker(allowedPaths []string, checker PathChecker) *ListDirectoryTool {
+    return &ListDirectoryTool{AllowedPaths: allowedPaths, checker: checker}
 }
 
 func (t *ListDirectoryTool) Name() string { return "list_directory" }
@@ -151,6 +153,7 @@ func (t *ListDirectoryTool) Execute(args map[string]interface{}) (interface{}, e
 }
 
 func (t *ListDirectoryTool) isPathAllowed(path string) bool {
+    if t.checker != nil { return t.checker.IsAllowed(path) }
     if len(t.AllowedPaths) == 0 { return false }
     absPath, err := filepath.Abs(path)
     if err != nil { return false }

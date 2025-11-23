@@ -14,10 +14,10 @@
 package main
 
 import (
-	"log"
-	"nira/memory"
-	"nira/tools"
-	"os"
+    "log"
+    "nira/memory"
+    "nira/tools"
+    "os"
 )
 
 func main() {
@@ -41,27 +41,48 @@ func main() {
 	}
 	defer db.Close()
 
-	memManager, err := memory.NewManager(db)
-	if err != nil {
-		log.Fatalf("Failed to initialize memory manager: %v", err)
-	}
+ memManager, err := memory.NewManager(db)
+ if err != nil {
+     log.Fatalf("Failed to initialize memory manager: %v", err)
+ }
+
+ // Initialize Allowed Directories store and seed from config
+ allowedStore, err := memory.NewAllowedDirsStore(db)
+ if err != nil {
+     log.Fatalf("Failed to initialize allowed directories store: %v", err)
+ }
+ if err := allowedStore.EnsureSeed(config.AllowedPaths); err != nil {
+     log.Printf("Warning: failed to seed allowed directories: %v", err)
+ }
+ memManager.AllowedDirs = allowedStore
 
 	ollamaClient := NewOllamaClient(config.OllamaEndpoint, config.DefaultModel)
 
  toolRegistry := tools.NewRegistry()
- fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
+ // Use centralized AllowedDirs store for permission checks
+ fileReadTool := tools.NewFileReadToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(fileReadTool)
 
- fileWriteTool := tools.NewFileWriteTool(config.AllowedPaths)
+ fileWriteTool := tools.NewFileWriteToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(fileWriteTool)
 
  // RAG foundation tools
- listDirTool := tools.NewListDirectoryTool(config.AllowedPaths)
+ listDirTool := tools.NewListDirectoryToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(listDirTool)
- searchByNameTool := tools.NewSearchFilesByNameTool(config.AllowedPaths)
+ searchByNameTool := tools.NewSearchFilesByNameToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(searchByNameTool)
- fileMetaTool := tools.NewFileMetadataTool(config.AllowedPaths)
+ fileMetaTool := tools.NewFileMetadataToolWithChecker(config.AllowedPaths, allowedStore)
  toolRegistry.Register(fileMetaTool)
+
+ // Allowed directory management tools
+ toolRegistry.Register(tools.NewAllowedDirsListTool(allowedStore))
+ toolRegistry.Register(tools.NewAllowedDirsAddTool(allowedStore))
+ toolRegistry.Register(tools.NewAllowedDirsRemoveTool(allowedStore))
+
+ // Basic RAG indexing and retrieval tools
+ ragIndex := memory.NewRagIndex(db)
+ toolRegistry.Register(tools.NewRagIndexFolderTool(allowedStore, ragIndex))
+ toolRegistry.Register(tools.NewRagSearchTool(ragIndex, allowedStore))
 
 	// Register WebSearchTool
 	tools.RegisterWebSearchTool(toolRegistry.Tools)

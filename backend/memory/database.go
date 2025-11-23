@@ -42,7 +42,7 @@ func NewDatabase(dbPath string) (*Database, error) {
 }
 
 func (d *Database) InitializeSchema() error {
-	schema := `
+    schema := `
 	CREATE TABLE IF NOT EXISTS conversations (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		created_at TEXT NOT NULL,
@@ -76,7 +76,26 @@ func (d *Database) InitializeSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_memories_key ON memories(key);
 	CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
-	`
+
+	-- Allowed directories for sandboxed filesystem access
+	CREATE TABLE IF NOT EXISTS allowed_directories (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		path TEXT UNIQUE NOT NULL,
+		added_at TEXT NOT NULL
+	);
+
+	-- Lightweight RAG text index (basic, non-embedding)
+	CREATE TABLE IF NOT EXISTS rag_index (
+		path TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		mod_time TEXT NOT NULL,
+		size INTEGER NOT NULL,
+		hash TEXT,
+		content TEXT
+	);
+	CREATE INDEX IF NOT EXISTS idx_rag_index_name ON rag_index(name);
+	CREATE INDEX IF NOT EXISTS idx_rag_index_mod ON rag_index(mod_time);
+    `
 
 	if _, err := d.DB.Exec(schema); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)

@@ -7,13 +7,16 @@ import (
 )
 
 type FileWriteTool struct {
-	AllowedPaths []string
+    AllowedPaths []string
+    checker      PathChecker
 }
 
 func NewFileWriteTool(allowedPaths []string) *FileWriteTool {
-	return &FileWriteTool{
-		AllowedPaths: allowedPaths,
-	}
+    return &FileWriteTool{AllowedPaths: allowedPaths}
+}
+
+func NewFileWriteToolWithChecker(allowedPaths []string, checker PathChecker) *FileWriteTool {
+    return &FileWriteTool{AllowedPaths: allowedPaths, checker: checker}
 }
 
 func (t *FileWriteTool) Name() string {
@@ -55,9 +58,9 @@ func (t *FileWriteTool) Execute(args map[string]interface{}) (interface{}, error
 		return nil, fmt.Errorf("content argument is required and must be a string")
 	}
 
-	if !t.isPathAllowed(path) {
-		return nil, fmt.Errorf("path '%s' is not in allowed directories", path)
-	}
+ if !t.isPathAllowed(path) {
+        return nil, fmt.Errorf("path '%s' is not in allowed directories", path)
+    }
 
 	// Ensure directory exists
 	dir := filepath.Dir(path)
@@ -73,30 +76,22 @@ func (t *FileWriteTool) Execute(args map[string]interface{}) (interface{}, error
 }
 
 func (t *FileWriteTool) isPathAllowed(path string) bool {
-	if len(t.AllowedPaths) == 0 {
-		return false
-	}
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return false
-	}
-
-	for _, allowed := range t.AllowedPaths {
-		absAllowed, err := filepath.Abs(allowed)
-		if err != nil {
-			continue
-		}
-
-		rel, err := filepath.Rel(absAllowed, absPath)
-		if err != nil {
-			continue
-		}
-
-		if rel != ".." && !filepath.IsAbs(rel) {
-			return true
-		}
-	}
-
-	return false
+    if t.checker != nil {
+        return t.checker.IsAllowed(path)
+    }
+    if len(t.AllowedPaths) == 0 {
+        return false
+    }
+    absPath, err := filepath.Abs(path)
+    if err != nil { return false }
+    for _, allowed := range t.AllowedPaths {
+        absAllowed, err := filepath.Abs(allowed)
+        if err != nil { continue }
+        rel, err := filepath.Rel(absAllowed, absPath)
+        if err != nil { continue }
+        if rel != ".." && !filepath.IsAbs(rel) {
+            return true
+        }
+    }
+    return false
 }

@@ -14,19 +14,20 @@
 package memory
 
 type Manager struct {
-	Conversations *ConversationStore
-	Memories      *MemoryStore
-	CurrentConvID int64
+    Conversations *ConversationStore
+    Memories      *MemoryStore
+    CurrentConvID int64
+    AllowedDirs   *AllowedDirsStore
 }
 
 func NewManager(db *Database) (*Manager, error) {
-	convStore := NewConversationStore(db)
-	memStore := NewMemoryStore(db)
+    convStore := NewConversationStore(db)
+    memStore := NewMemoryStore(db)
 
-	manager := &Manager{
-		Conversations: convStore,
-		Memories:      memStore,
-	}
+    manager := &Manager{
+        Conversations: convStore,
+        Memories:      memStore,
+    }
 
 	currentID, err := convStore.GetCurrentConversation()
 	if err != nil {
@@ -40,8 +41,8 @@ func NewManager(db *Database) (*Manager, error) {
 		}
 	}
 
-	manager.CurrentConvID = currentID
-	return manager, nil
+    manager.CurrentConvID = currentID
+    return manager, nil
 }
 
 func (m *Manager) SaveMessage(role, content, metadata string) error {

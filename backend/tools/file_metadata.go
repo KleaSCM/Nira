@@ -10,10 +10,12 @@ import (
 // FileMetadataTool returns basic metadata for a given path.
 type FileMetadataTool struct {
     AllowedPaths []string
+    checker      PathChecker
 }
 
-func NewFileMetadataTool(allowedPaths []string) *FileMetadataTool {
-    return &FileMetadataTool{AllowedPaths: allowedPaths}
+func NewFileMetadataTool(allowedPaths []string) *FileMetadataTool { return &FileMetadataTool{AllowedPaths: allowedPaths} }
+func NewFileMetadataToolWithChecker(allowedPaths []string, checker PathChecker) *FileMetadataTool {
+    return &FileMetadataTool{AllowedPaths: allowedPaths, checker: checker}
 }
 
 func (t *FileMetadataTool) Name() string { return "file_metadata" }
@@ -65,6 +67,7 @@ func (t *FileMetadataTool) Execute(args map[string]interface{}) (interface{}, er
 }
 
 func (t *FileMetadataTool) isPathAllowed(path string) bool {
+    if t.checker != nil { return t.checker.IsAllowed(path) }
     if len(t.AllowedPaths) == 0 { return false }
     absPath, err := filepath.Abs(path)
     if err != nil { return false }

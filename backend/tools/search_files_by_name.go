@@ -11,10 +11,12 @@ import (
 // SearchFilesByNameTool searches for files (and optionally directories) by name pattern under a root.
 type SearchFilesByNameTool struct {
     AllowedPaths []string
+    checker      PathChecker
 }
 
-func NewSearchFilesByNameTool(allowedPaths []string) *SearchFilesByNameTool {
-    return &SearchFilesByNameTool{AllowedPaths: allowedPaths}
+func NewSearchFilesByNameTool(allowedPaths []string) *SearchFilesByNameTool { return &SearchFilesByNameTool{AllowedPaths: allowedPaths} }
+func NewSearchFilesByNameToolWithChecker(allowedPaths []string, checker PathChecker) *SearchFilesByNameTool {
+    return &SearchFilesByNameTool{AllowedPaths: allowedPaths, checker: checker}
 }
 
 func (t *SearchFilesByNameTool) Name() string { return "search_files_by_name" }
@@ -153,6 +155,7 @@ func (t *SearchFilesByNameTool) Execute(args map[string]interface{}) (interface{
 }
 
 func (t *SearchFilesByNameTool) isPathAllowed(path string) bool {
+    if t.checker != nil { return t.checker.IsAllowed(path) }
     if len(t.AllowedPaths) == 0 { return false }
     absPath, err := filepath.Abs(path)
     if err != nil { return false }
