@@ -136,6 +136,7 @@ class RolePlayRepository {
         'goals': <String>[],
         'tags': <String>[],
         'notes': '',
+        'world': c.world, // PATCH: add world
       });
       // Backend returns an object with string id; we ignore local int id
       return 0;
@@ -173,7 +174,7 @@ class RolePlayRepository {
             id: null,
             name: (m['name'] ?? '') as String,
             description: (m['summary'] ?? m['notes'] ?? '') as String,
-            world: '',
+            world: (m['world'] ?? '') as String, // PATCH: get world from backend if present
           );
         }).toList();
       }
@@ -204,6 +205,7 @@ class RolePlayRepository {
         'content': s.content,
         'tags': <String>[],
         'links': <String>[],
+        'world': s.world, // PATCH: add world
       });
       return 0;
     } catch (_) {
@@ -239,7 +241,7 @@ class RolePlayRepository {
             id: null,
             title: (m['title'] ?? '') as String,
             content: (m['content'] ?? '') as String,
-            world: '',
+            world: (m['world'] ?? '') as String, // PATCH: get world from backend if present
           );
         }).toList();
       }
