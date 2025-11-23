@@ -121,6 +121,61 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     });
   }
 
+  // Show dialog for web search input
+  void _showWebSearchDialog() {
+    final TextEditingController searchController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Web Search'),
+          content: TextField(
+            controller: searchController,
+            decoration: const InputDecoration(hintText: 'Enter search query'),
+            autofocus: true,
+            onSubmitted: (value) {
+              Navigator.of(context).pop();
+              _sendWebSearch(value.trim());
+            },
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Search'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _sendWebSearch(searchController.text.trim());
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Send web search tool call to backend and display results
+  void _sendWebSearch(String query) async {
+    if (query.isEmpty) return;
+    setState(() {
+      Messages.add({
+        'text': 'Searching the web for: "$query"',
+        'sender': 'You',
+      });
+      CurrentAssistantIndex = -1;
+    });
+    _scrollToBottom();
+
+    // Send tool call via WebSocketService
+    final toolCall = {
+      'name': 'web_search',
+      'arguments': {'query': query},
+    };
+    WsService.sendToolCall(toolCall);
+  }
+
   Widget _buildAvatar(String sender) {
     final isNira = sender == 'NIRA';
     return Container(
@@ -233,7 +288,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // New: chat body extracted so it can be used in TabBarView
+  // Chat body extracted so it can be used in TabBarView
   Widget _buildChatBody() {
     return Column(
       children: [
@@ -283,6 +338,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     _buildToolButton(Icons.attachment_outlined, 'File', Colors.purple),
                     _buildToolButton(Icons.camera_alt_outlined, 'Camera', Colors.deepPurple),
                     _buildToolButton(Icons.location_on_outlined, 'Location', Colors.pinkAccent),
+                    _buildToolButton(Icons.public, 'Web Search', Colors.blueAccent),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -435,7 +491,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     );
   }
 
-  // New: simple RP view placeholder
+  // Simple RP view placeholder
   Widget _buildRPView() {
    return const RolePlayDashboard();
   }
@@ -515,7 +571,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                                 ),
                               ),
                               Text(
-                                'lkhjsdf',
+                                'Always here for you',
                                 style: GoogleFonts.quicksand(
                                   color: Colors.white.withOpacity(0.9),
                                   fontSize: 13,
@@ -585,7 +641,10 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
           child: IconButton(
             icon: Icon(icon, color: color, size: 22),
             onPressed: () {
-              // TODO: Implement tool functionality
+              if (label == 'Web Search') {
+                _showWebSearchDialog();
+              }
+              // TODO: Implement other tool functionality
             },
           ),
         ),

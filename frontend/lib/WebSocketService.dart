@@ -53,6 +53,11 @@ class WSMessage {
 }
 
 class WebSocketService {
+		/// Send a tool call to the backend (e.g. {"name": "web_search", "arguments": {"query": "..."}})
+		void sendToolCall(Map<String, dynamic> toolCall) {
+			if (Channel == null || !IsConnected) return;
+			Channel!.sink.add(jsonEncode(toolCall));
+		}
 	WebSocketChannel? Channel;
 	String CurrentMessage = '';
 	bool IsConnected = false;

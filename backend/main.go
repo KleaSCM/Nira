@@ -52,6 +52,9 @@ func main() {
 	fileReadTool := tools.NewFileReadTool(config.AllowedPaths)
 	toolRegistry.Register(fileReadTool)
 
+	// Register WebSearchTool
+	tools.RegisterWebSearchTool(toolRegistry.Tools)
+
 	server := NewServer(config.WebSocketPort, ollamaClient, toolRegistry, logger, memManager)
 
 	log.Println("Starting NIRA backend...")

@@ -65,3 +65,6 @@ Scope.txt
 StyleGuide.txt
 progress.txt
 .windsurf
+backend/nira.db-shm
+backend/nira.db-wal
+backend/nira.db-shm
