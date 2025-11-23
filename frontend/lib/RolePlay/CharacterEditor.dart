@@ -59,7 +59,6 @@ class _CharacterEditorState extends State<CharacterEditor> {
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _save, child: const Text('Save')),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _save, child: const Text('Save')),
           ],
         ),
       ),
